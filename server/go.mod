@@ -1,4 +1,4 @@
-module 网络验证/server
+module github.com/Lazywords2006/web/server
 
 go 1.21
 

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"网络验证/server/database"
-	"网络验证/server/models"
-	"网络验证/server/utils"
+	"github.com/Lazywords2006/web/server/database"
+	"github.com/Lazywords2006/web/server/models"
+	"github.com/Lazywords2006/web/server/utils"
 )
 
 // ActivateRequest 激活请求

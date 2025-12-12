@@ -17,6 +17,7 @@ go.work
 # Compiled binary
 secure-client
 secure-client-*
+license-server
 test-server
 
 # Configuration files (should not be committed)

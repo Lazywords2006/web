@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"网络验证/auth"
-	"网络验证/heartbeat"
-	"网络验证/hwid"
+	"github.com/Lazywords2006/web/auth"
+	"github.com/Lazywords2006/web/heartbeat"
+	"github.com/Lazywords2006/web/hwid"
 )
 
 // Config 应用程序配置

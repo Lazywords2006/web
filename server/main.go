@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 
-	"网络验证/server/database"
-	"网络验证/server/handlers"
+	"github.com/Lazywords2006/web/server/database"
+	"github.com/Lazywords2006/web/server/handlers"
 )
 
 func main() {
