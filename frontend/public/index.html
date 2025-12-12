@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>购买许可证 - License Store</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .pricing-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .pricing-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.3);
+        }
+
+        .pricing-card.featured {
+            border: 3px solid #667eea;
+        }
+
+        .pricing-card.featured::before {
+            content: "最受欢迎";
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #667eea;
+            color: white;
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .pricing-card h2 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .pricing-card .price {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .pricing-card .price small {
+            font-size: 18px;
+            color: #999;
+        }
+
+        .pricing-card .duration {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .pricing-card .features {
+            list-style: none;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .pricing-card .features li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+        }
+
+        .pricing-card .features li::before {
+            content: "✓ ";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .btn-purchase {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-purchase:hover {
+            background: #5568d3;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .license-key-box {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            text-align: center;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .copy-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .copy-btn:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 软件许可证商店</h1>
+            <p>选择适合您的许可证套餐，立即激活</p>
+        </div>
+
+        <div class="pricing-cards" id="pricing-cards">
+            <!-- 价格卡片将通过JavaScript动态加载 -->
+            <div class="pricing-card">
+                <h2>基础版</h2>
+                <div class="price">¥9.99</div>
+                <div class="duration">1个月</div>
+                <ul class="features">
+                    <li>1台设备授权</li>
+                    <li>30天有效期</li>
+                    <li>邮件技术支持</li>
+                </ul>
+                <button class="btn-purchase" onclick="openPurchaseModal('Basic License', 9.99, 30, 1)">立即购买</button>
+            </div>
+
+            <div class="pricing-card featured">
+                <h2>标准版</h2>
+                <div class="price">¥24.99</div>
+                <div class="duration">3个月</div>
+                <ul class="features">
+                    <li>2台设备授权</li>
+                    <li>90天有效期</li>
+                    <li>优先技术支持</li>
+                    <li>免费更新</li>
+                </ul>
+                <button class="btn-purchase" onclick="openPurchaseModal('Standard License', 24.99, 90, 2)">立即购买</button>
+            </div>
+
+            <div class="pricing-card">
+                <h2>高级版</h2>
+                <div class="price">¥79.99</div>
+                <div class="duration">1年</div>
+                <ul class="features">
+                    <li>5台设备授权</li>
+                    <li>365天有效期</li>
+                    <li>7x24小时支持</li>
+                    <li>免费更新</li>
+                    <li>专属客服</li>
+                </ul>
+                <button class="btn-purchase" onclick="openPurchaseModal('Premium License', 79.99, 365, 5)">立即购买</button>
+            </div>
+
+            <div class="pricing-card">
+                <h2>终身版</h2>
+                <div class="price">¥199.99</div>
+                <div class="duration">终身有效</div>
+                <ul class="features">
+                    <li>10台设备授权</li>
+                    <li>永久有效</li>
+                    <li>7x24小时支持</li>
+                    <li>终身免费更新</li>
+                    <li>专属客服</li>
+                    <li>VIP权益</li>
+                </ul>
+                <button class="btn-purchase" onclick="openPurchaseModal('Lifetime License', 199.99, 36500, 10)">立即购买</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 购买模态框 -->
+    <div id="purchase-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePurchaseModal()">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #667eea;">完成购买</h2>
+
+            <div id="purchase-alert" class="alert hidden"></div>
+
+            <form id="purchase-form">
+                <div class="form-group">
+                    <label>产品名称</label>
+                    <input type="text" id="product-name" readonly>
+                </div>
+                <div class="form-group">
+                    <label>价格</label>
+                    <input type="text" id="product-price" readonly>
+                </div>
+                <div class="form-group">
+                    <label>邮箱地址</label>
+                    <input type="email" id="user-email" placeholder="your@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label>姓名</label>
+                    <input type="text" id="user-name" placeholder="您的姓名" required>
+                </div>
+
+                <button type="submit" class="btn-purchase" style="margin-top: 10px;">
+                    确认购买
+                </button>
+            </form>
+
+            <div id="license-result" class="hidden">
+                <h3 style="color: #10b981; margin-bottom: 15px;">✓ 购买成功！</h3>
+                <p style="margin-bottom: 15px;">您的许可证密钥：</p>
+                <div class="license-key-box" id="license-key-display"></div>
+                <button class="copy-btn" onclick="copyLicenseKey()">复制许可证密钥</button>
+                <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                    许可证密钥已发送到您的邮箱，请妥善保管。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentPurchaseData = {};
+
+        // 打开购买模态框
+        function openPurchaseModal(productName, price, duration, maxDevices) {
+            currentPurchaseData = { productName, price, duration, maxDevices };
+
+            document.getElementById('product-name').value = productName;
+            document.getElementById('product-price').value = `¥${price}`;
+            document.getElementById('purchase-form').classList.remove('hidden');
+            document.getElementById('license-result').classList.add('hidden');
+            document.getElementById('purchase-alert').classList.add('hidden');
+            document.getElementById('purchase-modal').classList.add('active');
+        }
+
+        // 关闭购买模态框
+        function closePurchaseModal() {
+            document.getElementById('purchase-modal').classList.remove('active');
+        }
+
+        // 处理购买表单提交
+        document.getElementById('purchase-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('user-email').value;
+            const name = document.getElementById('user-name').value;
+
+            // 显示处理中
+            showPurchaseAlert('处理中，请稍候...', 'info');
+
+            try {
+                // 1. 生成许可证
+                const licenseResponse = await fetch(`${API_BASE}/api/admin/license`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        product_name: currentPurchaseData.productName,
+                        duration: currentPurchaseData.duration,
+                        max_devices: currentPurchaseData.maxDevices
+                    })
+                });
+
+                if (!licenseResponse.ok) {
+                    throw new Error('生成许可证失败');
+                }
+
+                const licenseData = await licenseResponse.json();
+
+                // 2. 显示许可证
+                document.getElementById('purchase-form').classList.add('hidden');
+                document.getElementById('license-key-display').textContent = licenseData.license_key;
+                document.getElementById('license-result').classList.remove('hidden');
+
+                // TODO: 在实际应用中，这里应该：
+                // - 创建订单记录
+                // - 调用支付接口
+                // - 发送邮件通知
+                // - 更新用户信息
+
+            } catch (error) {
+                showPurchaseAlert('购买失败: ' + error.message, 'error');
+            }
+        });
+
+        // 复制许可证密钥
+        function copyLicenseKey() {
+            const keyText = document.getElementById('license-key-display').textContent;
+            navigator.clipboard.writeText(keyText).then(() => {
+                alert('许可证密钥已复制到剪贴板！');
+            });
+        }
+
+        // 显示提示信息
+        function showPurchaseAlert(message, type) {
+            const alert = document.getElementById('purchase-alert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+            alert.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

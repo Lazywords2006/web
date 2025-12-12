@@ -1,0 +1,7 @@
+{
+  "server_url": "http://localhost:8080",
+  "license_key": "",
+  "heartbeat_interval_seconds": 30,
+  "max_retries": 3,
+  "retry_delay_seconds": 2
+}

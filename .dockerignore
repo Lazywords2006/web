@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# 构建产物
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+secure-client*
+test-server
+
+# 数据库
+*.db
+*.db-journal
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+.DS_Store
+Thumbs.db
+
+# 配置文件
+config.json
+
+# 文档
+*.md
+!README.md
+
+# 测试文件
+*_test.go
