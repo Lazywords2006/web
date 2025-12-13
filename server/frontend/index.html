@@ -415,7 +415,10 @@
                 <h2>📝 生成许可证</h2>
                 <div class="form-group">
                     <label>许可证密钥 *</label>
-                    <input type="text" id="create-key" placeholder="例如: PROD-2025-001">
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="create-key" placeholder="例如: PROD-2025-001" style="flex: 1;">
+                        <button class="btn btn-secondary" onclick="generateLicenseKey()" style="width: auto; padding: 10px 20px; margin: 0;">🎲 随机生成</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>最大设备数 *</label>
@@ -469,17 +472,6 @@
                 </div>
                 <button class="btn btn-success" onclick="updateLicense()">更新许可证</button>
                 <div id="update-result"></div>
-            </div>
-
-            <!-- 删除许可证 -->
-            <div class="card">
-                <h2>🗑️ 删除许可证</h2>
-                <div class="form-group">
-                    <label>许可证密钥</label>
-                    <input type="text" id="delete-key" placeholder="要删除的许可证密钥">
-                </div>
-                <button class="btn btn-danger" onclick="deleteLicense()">删除许可证</button>
-                <div id="delete-result"></div>
             </div>
         </div>
 
@@ -567,6 +559,16 @@
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
             return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        // 生成随机许可证密钥
+        function generateLicenseKey() {
+            const prefix = 'LICENSE';
+            const year = new Date().getFullYear();
+            const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const timestamp = Date.now().toString().slice(-4);
+            const key = `${prefix}-${year}-${random}${timestamp}`;
+            document.getElementById('create-key').value = key;
         }
 
         // 加载统计数据
@@ -691,39 +693,6 @@
             }
         }
 
-        // 删除许可证
-        async function deleteLicense() {
-            const key = document.getElementById('delete-key').value;
-
-            if (!key) {
-                showResult('delete-result', '请输入许可证密钥', 'error');
-                return;
-            }
-
-            if (!confirm(`确定要删除许可证 "${key}" 吗？此操作不可恢复！`)) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/api/admin/license?key=${encodeURIComponent(key)}`, {
-                    method: 'DELETE'
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    showResult('delete-result', '许可证删除成功！', 'success');
-                    document.getElementById('delete-key').value = '';
-                    loadDashboard();
-                    loadAllLicenses();
-                } else {
-                    showResult('delete-result', '删除失败: ' + (result.error || '未知错误'), 'error');
-                }
-            } catch (error) {
-                showResult('delete-result', '请求失败: ' + error.message, 'error');
-            }
-        }
-
         // 加载所有许可证
         let allLicenses = [];
         async function loadAllLicenses() {
@@ -777,7 +746,6 @@
                 html += `<td>${license.note || '-'}</td>`;
                 html += `<td class="action-buttons">`;
                 html += `<button class="btn btn-small btn-secondary" onclick='viewDetails(${JSON.stringify(license)})'>详情</button>`;
-                html += `<button class="btn btn-small btn-danger" onclick="quickDelete('${license.key}')">删除</button>`;
                 html += `</td>`;
                 html += '</tr>';
             });
@@ -844,30 +812,6 @@
         // 关闭模态框
         function closeModal() {
             document.getElementById('detailModal').classList.remove('active');
-        }
-
-        // 快速删除
-        async function quickDelete(key) {
-            if (!confirm(`确定要删除许可证 "${key}" 吗？`)) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/api/admin/license?key=${encodeURIComponent(key)}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    alert('删除成功！');
-                    loadDashboard();
-                    loadAllLicenses();
-                } else {
-                    const result = await response.json();
-                    alert('删除失败: ' + (result.error || '未知错误'));
-                }
-            } catch (error) {
-                alert('请求失败: ' + error.message);
-            }
         }
 
         // 显示结果
