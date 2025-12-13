@@ -204,7 +204,6 @@ func HandleUpdateLicense(w http.ResponseWriter, r *http.Request) {
 		Status     string    `json:"status,omitempty"`
 		ExpiryDate string    `json:"expiry_date,omitempty"`
 		MaxDevices int       `json:"max_devices,omitempty"`
-		Note       string    `json:"note,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -254,19 +253,12 @@ func HandleUpdateLicense(w http.ResponseWriter, r *http.Request) {
 		args = append(args, req.MaxDevices)
 	}
 
-	if req.Note != "" {
-		updates = append(updates, "note = ?")
-		args = append(args, req.Note)
-	}
-
 	if len(updates) == 0 {
 		respondError(w, "No fields to update", http.StatusBadRequest)
 		return
 	}
 
-	// 添加 updated_at 和 license_key
-	updates = append(updates, "updated_at = ?")
-	args = append(args, time.Now())
+	// 构建查询，添加 license_key 参数
 	args = append(args, licenseKey)
 
 	query := "UPDATE licenses SET " + updates[0]
