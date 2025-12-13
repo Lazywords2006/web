@@ -199,8 +199,12 @@ func HandleUpdateLicense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		LicenseKey string `json:"license_key"`
-		Status     string `json:"status"`
+		LicenseKey string    `json:"license_key"`
+		Key        string    `json:"key"` // 兼容前端使用的 key 字段
+		Status     string    `json:"status,omitempty"`
+		ExpiryDate string    `json:"expiry_date,omitempty"`
+		MaxDevices int       `json:"max_devices,omitempty"`
+		Note       string    `json:"note,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -208,17 +212,70 @@ func HandleUpdateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 验证状态
-	validStatuses := map[string]bool{"active": true, "unused": true, "expired": true, "banned": true}
-	if !validStatuses[req.Status] {
-		respondError(w, "Invalid status", http.StatusBadRequest)
+	// 兼容 key 和 license_key 两种字段
+	licenseKey := req.LicenseKey
+	if licenseKey == "" {
+		licenseKey = req.Key
+	}
+
+	if licenseKey == "" {
+		respondError(w, "Missing license key", http.StatusBadRequest)
 		return
 	}
 
-	result, err := database.DB.Exec(`
-		UPDATE licenses SET status = ?, updated_at = ? WHERE license_key = ?
-	`, req.Status, time.Now(), req.LicenseKey)
+	// 构建动态 UPDATE 语句
+	updates := []string{}
+	args := []interface{}{}
 
+	if req.Status != "" {
+		// 验证状态
+		validStatuses := map[string]bool{"active": true, "unused": true, "expired": true, "banned": true}
+		if !validStatuses[req.Status] {
+			respondError(w, "Invalid status", http.StatusBadRequest)
+			return
+		}
+		updates = append(updates, "status = ?")
+		args = append(args, req.Status)
+	}
+
+	if req.ExpiryDate != "" {
+		// 解析并验证时间格式
+		expiryTime, err := time.Parse(time.RFC3339, req.ExpiryDate)
+		if err != nil {
+			respondError(w, "Invalid expiry_date format", http.StatusBadRequest)
+			return
+		}
+		updates = append(updates, "expires_at = ?")
+		args = append(args, expiryTime)
+	}
+
+	if req.MaxDevices > 0 {
+		updates = append(updates, "max_devices = ?")
+		args = append(args, req.MaxDevices)
+	}
+
+	if req.Note != "" {
+		updates = append(updates, "note = ?")
+		args = append(args, req.Note)
+	}
+
+	if len(updates) == 0 {
+		respondError(w, "No fields to update", http.StatusBadRequest)
+		return
+	}
+
+	// 添加 updated_at 和 license_key
+	updates = append(updates, "updated_at = ?")
+	args = append(args, time.Now())
+	args = append(args, licenseKey)
+
+	query := "UPDATE licenses SET " + updates[0]
+	for i := 1; i < len(updates); i++ {
+		query += ", " + updates[i]
+	}
+	query += " WHERE license_key = ?"
+
+	result, err := database.DB.Exec(query, args...)
 	if err != nil {
 		log.Printf("[Admin] Failed to update license: %v", err)
 		respondError(w, "Failed to update license", http.StatusInternalServerError)
@@ -231,7 +288,7 @@ func HandleUpdateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Admin] Updated license %s status to %s", req.LicenseKey, req.Status)
+	log.Printf("[Admin] Updated license %s", licenseKey)
 
 	respondJSON(w, map[string]string{
 		"message": "License updated successfully",

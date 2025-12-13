@@ -868,15 +868,24 @@
             try {
                 // 先获取当前许可证信息
                 const getResponse = await fetch(`${API_BASE}/api/admin/license?key=${encodeURIComponent(key)}`);
-                const licenseData = await getResponse.json();
+                const data = await getResponse.json();
 
                 if (!getResponse.ok) {
-                    alert('获取许可证信息失败: ' + (licenseData.error || '未知错误'));
+                    alert('获取许可证信息失败: ' + (data.error || '未知错误'));
                     return;
                 }
 
-                // 计算新的过期时间
-                const currentExpiry = new Date(licenseData.expiry_date || licenseData.expires_at);
+                // 后端返回格式: {license: {...}, logs: [...]}
+                const licenseData = data.license || data;
+
+                // 计算新的过期时间 - 兼容多种字段名
+                const expiryField = licenseData.expiry_date || licenseData.expires_at;
+                if (!expiryField) {
+                    alert('无法获取许可证过期时间');
+                    return;
+                }
+
+                const currentExpiry = new Date(expiryField);
                 const newExpiry = new Date(currentExpiry);
                 newExpiry.setMonth(newExpiry.getMonth() + parseInt(months));
 
