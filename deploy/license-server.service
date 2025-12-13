@@ -1,0 +1,44 @@
+[Unit]
+Description=License Server
+Documentation=https://github.com/Lazywords2006/web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=license-server
+Group=license-server
+WorkingDirectory=/opt/license-server
+
+# 服务进程
+ExecStart=/opt/license-server/license-server
+
+# 环境变量
+Environment="PORT=8080"
+Environment="DB_PATH=/var/lib/license-server/licenses.db"
+Environment="JWT_SECRET=CHANGE_THIS_SECRET_KEY"
+
+# 重启策略
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# 安全加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/license-server /var/log/license-server
+
+# 日志
+StandardOutput=append:/var/log/license-server/server.log
+StandardError=append:/var/log/license-server/error.log
+SyslogIdentifier=license-server
+
+# 资源限制
+LimitNOFILE=65535
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

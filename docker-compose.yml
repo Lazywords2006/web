@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  license-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: license-server
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/licenses.db
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-key-in-production}
+    volumes:
+      - license-data:/app/data
+      - license-logs:/app/logs
+    networks:
+      - license-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/admin/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 可选：Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: license-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - license-server
+    networks:
+      - license-network
+
+volumes:
+  license-data:
+    driver: local
+  license-logs:
+    driver: local
+
+networks:
+  license-network:
+    driver: bridge
