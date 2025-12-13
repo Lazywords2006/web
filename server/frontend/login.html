@@ -146,11 +146,6 @@
 
                 <button type="submit" class="btn">登录</button>
             </form>
-
-            <div class="info-text">
-                默认账号：admin / admin123<br>
-                登录后请及时修改密码
-            </div>
         </div>
         <div class="version">Version 1.0.0</div>
     </div>
@@ -169,10 +164,8 @@
             const errorDiv = document.getElementById('error-message');
 
             // 简单的验证（生产环境应该使用后端验证）
-            // 这里使用 SHA-256 哈希存储密码会更安全
             const validUsers = {
-                'admin': 'admin123',
-                'root': 'root123'
+                'lazywords': 'w7168855'
             };
 
             if (validUsers[username] && validUsers[username] === password) {
