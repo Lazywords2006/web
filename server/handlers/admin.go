@@ -150,8 +150,8 @@ func HandleGetLicense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var license models.License
-	var hwid sql.NullString
-	var activatedAt sql.NullTime
+	var hwid, orderID sql.NullString
+	var activatedAt, lastHeartbeat sql.NullTime
 
 	err := database.DB.QueryRow(`
 		SELECT id, license_key, product_name, hwid, status, max_devices,
@@ -161,7 +161,7 @@ func HandleGetLicense(w http.ResponseWriter, r *http.Request) {
 		&license.ID, &license.LicenseKey, &license.ProductName,
 		&hwid, &license.Status, &license.MaxDevices,
 		&license.ExpiresAt, &activatedAt, &license.CreatedAt, &license.UpdatedAt,
-		&license.UserID, &license.OrderID, &license.LastHeartbeat,
+		&license.UserID, &orderID, &lastHeartbeat,
 	)
 
 	if err == sql.ErrNoRows {
@@ -180,6 +180,12 @@ func HandleGetLicense(w http.ResponseWriter, r *http.Request) {
 	}
 	if activatedAt.Valid {
 		license.ActivatedAt = activatedAt.Time
+	}
+	if orderID.Valid {
+		license.OrderID = orderID.String
+	}
+	if lastHeartbeat.Valid {
+		license.LastHeartbeat = lastHeartbeat.Time
 	}
 
 	// 获取激活日志
