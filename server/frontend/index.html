@@ -734,17 +734,18 @@
             html += '</tr></thead><tbody>';
 
             licenses.forEach(license => {
-                // 安全地获取数据
-                const key = license.key || '未知';
+                // 安全地获取数据，兼容不同的字段名
+                const key = license.key || license.license_key || '未知';
                 const maxDevices = license.max_devices || 1;
                 const activatedDevices = license.activated_devices || 0;
                 const note = license.note || '-';
 
-                // 格式化过期时间
+                // 格式化过期时间，兼容不同的字段名
                 let expiryDate = '-';
-                if (license.expiry_date) {
+                const dateField = license.expiry_date || license.expires_at;
+                if (dateField) {
                     try {
-                        const date = new Date(license.expiry_date);
+                        const date = new Date(dateField);
                         if (!isNaN(date.getTime())) {
                             expiryDate = date.toLocaleString('zh-CN', {
                                 year: 'numeric',
@@ -781,26 +782,37 @@
         // 过滤许可证
         function filterLicenses() {
             const searchText = document.getElementById('search-filter').value.toLowerCase();
-            const filtered = allLicenses.filter(license =>
-                license.key.toLowerCase().includes(searchText) ||
-                (license.note && license.note.toLowerCase().includes(searchText))
-            );
+            const filtered = allLicenses.filter(license => {
+                const key = (license.key || license.license_key || '').toLowerCase();
+                const note = (license.note || '').toLowerCase();
+                return key.includes(searchText) || note.includes(searchText);
+            });
             displayLicenses(filtered);
         }
 
         // 获取状态样式
         function getStatusClass(license) {
-            if (license.is_banned) return 'status-banned';
-            if (new Date(license.expiry_date) < new Date()) return 'status-expired';
-            if (license.activated_devices > 0) return 'status-active';
+            // 兼容不同的状态字段
+            const isBanned = license.is_banned || license.status === 'banned';
+            const expiryDate = license.expiry_date || license.expires_at;
+            const activatedDevices = license.activated_devices || 0;
+
+            if (isBanned) return 'status-banned';
+            if (expiryDate && new Date(expiryDate) < new Date()) return 'status-expired';
+            if (activatedDevices > 0) return 'status-active';
             return 'status-unused';
         }
 
         // 获取状态文本
         function getStatusText(license) {
-            if (license.is_banned) return '已封禁';
-            if (new Date(license.expiry_date) < new Date()) return '已过期';
-            if (license.activated_devices > 0) return '已激活';
+            // 兼容不同的状态字段
+            const isBanned = license.is_banned || license.status === 'banned';
+            const expiryDate = license.expiry_date || license.expires_at;
+            const activatedDevices = license.activated_devices || 0;
+
+            if (isBanned) return '已封禁';
+            if (expiryDate && new Date(expiryDate) < new Date()) return '已过期';
+            if (activatedDevices > 0) return '已激活';
             return '未使用';
         }
 
