@@ -734,18 +734,42 @@
             html += '</tr></thead><tbody>';
 
             licenses.forEach(license => {
+                // 安全地获取数据
+                const key = license.key || '未知';
+                const maxDevices = license.max_devices || 1;
+                const activatedDevices = license.activated_devices || 0;
+                const note = license.note || '-';
+
+                // 格式化过期时间
+                let expiryDate = '-';
+                if (license.expiry_date) {
+                    try {
+                        const date = new Date(license.expiry_date);
+                        if (!isNaN(date.getTime())) {
+                            expiryDate = date.toLocaleString('zh-CN', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        }
+                    } catch (e) {
+                        console.error('日期格式化错误:', e);
+                    }
+                }
+
                 const statusClass = getStatusClass(license);
                 const statusText = getStatusText(license);
-                const expiryDate = new Date(license.expiry_date).toLocaleString('zh-CN');
 
                 html += '<tr>';
-                html += `<td><strong>${license.key}</strong></td>`;
+                html += `<td><strong>${key}</strong></td>`;
                 html += `<td><span class="status-badge ${statusClass}">${statusText}</span></td>`;
-                html += `<td>${license.activated_devices || 0} / ${license.max_devices}</td>`;
+                html += `<td>${activatedDevices} / ${maxDevices}</td>`;
                 html += `<td>${expiryDate}</td>`;
-                html += `<td>${license.note || '-'}</td>`;
+                html += `<td>${note}</td>`;
                 html += `<td class="action-buttons">`;
-                html += `<button class="btn btn-small btn-secondary" onclick='viewDetails(${JSON.stringify(license)})'>详情</button>`;
+                html += `<button class="btn btn-small btn-secondary" onclick='viewDetails(${JSON.stringify(license).replace(/'/g, "\\'")}))'>详情</button>`;
                 html += `</td>`;
                 html += '</tr>';
             });
