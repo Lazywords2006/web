@@ -867,21 +867,30 @@
 
             try {
                 // 先获取当前许可证信息
+                console.log('正在获取许可证信息:', key);
                 const getResponse = await fetch(`${API_BASE}/api/admin/license?key=${encodeURIComponent(key)}`);
+                console.log('HTTP状态:', getResponse.status);
+
                 const data = await getResponse.json();
+                console.log('服务器响应:', data);
 
                 if (!getResponse.ok) {
-                    alert('获取许可证信息失败: ' + (data.error || '未知错误'));
+                    console.error('获取失败，响应数据:', data);
+                    alert('获取许可证信息失败: ' + (data.error || '未知错误') + '\n\n请按F12查看浏览器控制台了解详情');
                     return;
                 }
 
                 // 后端返回格式: {license: {...}, logs: [...]}
                 const licenseData = data.license || data;
+                console.log('解析的许可证数据:', licenseData);
 
                 // 计算新的过期时间 - 兼容多种字段名
                 const expiryField = licenseData.expiry_date || licenseData.expires_at;
+                console.log('过期时间字段:', expiryField);
+
                 if (!expiryField) {
-                    alert('无法获取许可证过期时间');
+                    console.error('未找到过期时间字段，许可证数据:', licenseData);
+                    alert('无法获取许可证过期时间\n\n许可证数据: ' + JSON.stringify(licenseData, null, 2));
                     return;
                 }
 
@@ -889,26 +898,35 @@
                 const newExpiry = new Date(currentExpiry);
                 newExpiry.setMonth(newExpiry.getMonth() + parseInt(months));
 
+                console.log('当前过期时间:', currentExpiry);
+                console.log('新过期时间:', newExpiry);
+
                 // 更新许可证
+                const updatePayload = {
+                    key: key,
+                    expiry_date: newExpiry.toISOString()
+                };
+                console.log('更新请求数据:', updatePayload);
+
                 const updateResponse = await fetch(`${API_BASE}/api/admin/license`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        key: key,
-                        expiry_date: newExpiry.toISOString()
-                    })
+                    body: JSON.stringify(updatePayload)
                 });
 
                 const result = await updateResponse.json();
+                console.log('更新响应:', result);
 
                 if (updateResponse.ok) {
                     alert(`成功增加 ${months} 个月！\n新过期时间: ${newExpiry.toLocaleString('zh-CN')}`);
                     loadDashboard();
                     loadAllLicenses();
                 } else {
+                    console.error('更新失败:', result);
                     alert('更新失败: ' + (result.error || '未知错误'));
                 }
             } catch (error) {
+                console.error('请求异常:', error);
                 alert('请求失败: ' + error.message);
             }
         }
