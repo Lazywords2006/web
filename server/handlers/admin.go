@@ -79,7 +79,7 @@ func HandleListLicenses(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	userID := r.URL.Query().Get("user_id")
 
-	query := "SELECT id, license_key, product_name, hwid, status, max_devices, expires_at, activated_at, created_at, user_id, last_heartbeat FROM licenses WHERE 1=1"
+	query := "SELECT id, license_key, product_name, hwid, status, max_devices, expires_at, activated_at, created_at, updated_at, user_id, last_heartbeat FROM licenses WHERE 1=1"
 	args := []interface{}{}
 
 	if status != "" {
@@ -111,7 +111,7 @@ func HandleListLicenses(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(
 			&license.ID, &license.LicenseKey, &license.ProductName,
 			&hwid, &license.Status, &license.MaxDevices,
-			&license.ExpiresAt, &activatedAt, &license.CreatedAt,
+			&license.ExpiresAt, &activatedAt, &license.CreatedAt, &license.UpdatedAt,
 			&license.UserID, &lastHeartbeat,
 		)
 
@@ -155,12 +155,12 @@ func HandleGetLicense(w http.ResponseWriter, r *http.Request) {
 
 	err := database.DB.QueryRow(`
 		SELECT id, license_key, product_name, hwid, status, max_devices,
-		       expires_at, activated_at, created_at, user_id, order_id, last_heartbeat
+		       expires_at, activated_at, created_at, updated_at, user_id, order_id, last_heartbeat
 		FROM licenses WHERE license_key = ?
 	`, licenseKey).Scan(
 		&license.ID, &license.LicenseKey, &license.ProductName,
 		&hwid, &license.Status, &license.MaxDevices,
-		&license.ExpiresAt, &activatedAt, &license.CreatedAt,
+		&license.ExpiresAt, &activatedAt, &license.CreatedAt, &license.UpdatedAt,
 		&license.UserID, &license.OrderID, &license.LastHeartbeat,
 	)
 

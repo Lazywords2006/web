@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>API测试</title>
+</head>
+<body>
+    <h1>许可证API测试</h1>
+    <button onclick="testAPI()">测试获取许可证API</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = '正在测试...\n\n';
+
+            try {
+                // 1. 获取所有许可证
+                resultDiv.textContent += '1. 获取所有许可证列表...\n';
+                const listResponse = await fetch('/api/admin/licenses');
+                const listData = await listResponse.json();
+                resultDiv.textContent += `状态: ${listResponse.status}\n`;
+                resultDiv.textContent += `数据: ${JSON.stringify(listData, null, 2)}\n\n`;
+
+                if (listData.licenses && listData.licenses.length > 0) {
+                    const firstLicense = listData.licenses[0];
+                    const key = firstLicense.license_key || firstLicense.key;
+
+                    resultDiv.textContent += `2. 获取单个许可证: ${key}\n`;
+                    const getResponse = await fetch(`/api/admin/license?key=${encodeURIComponent(key)}`);
+                    const getData = await getResponse.json();
+                    resultDiv.textContent += `状态: ${getResponse.status}\n`;
+                    resultDiv.textContent += `数据: ${JSON.stringify(getData, null, 2)}\n\n`;
+
+                    // 检查字段
+                    if (getData.license) {
+                        resultDiv.textContent += '字段检查:\n';
+                        resultDiv.textContent += `- license_key: ${getData.license.license_key}\n`;
+                        resultDiv.textContent += `- expires_at: ${getData.license.expires_at}\n`;
+                        resultDiv.textContent += `- expiry_date: ${getData.license.expiry_date}\n`;
+                        resultDiv.textContent += `- status: ${getData.license.status}\n`;
+                        resultDiv.textContent += `- max_devices: ${getData.license.max_devices}\n`;
+                    }
+                } else {
+                    resultDiv.textContent += '没有许可证数据\n';
+                }
+            } catch (error) {
+                resultDiv.textContent += `\n错误: ${error.message}\n`;
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
