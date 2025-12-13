@@ -246,45 +246,425 @@ func loadConfig() (*Config, error)
 func RunMainApp()                // 业务逻辑占位符（替换为实际代码）
 ```
 
-## 生产环境部署建议
+## 生产环境部署指南
 
-### 安全加固
+### 📦 服务器端部署
 
-1. **启用SSL Pinning**（见 `auth/auth.go:35` 注释）
-   ```go
-   Transport: &http.Transport{
-       TLSClientConfig: &tls.Config{
-           RootCAs:      certPool,          // 固定证书池
-           MinVersion:   tls.VersionTLS12,
-       },
-   }
-   ```
+#### 方式一：直接运行（推荐用于开发/测试）
 
-2. **添加请求签名**（见 `auth/auth.go:67` 和 `auth/auth.go:121` 注释）
-   ```go
-   req.Header.Set("X-Request-Signature", generateHMAC(jsonData, secret))
-   ```
-
-3. **实现防篡改机制**（见 `heartbeat/heartbeat.go:99` 注释）
-   - 清理敏感数据
-   - 删除临时文件
-   - 写入审计日志
-
-### 编译优化
-
+1. **编译服务器端**
 ```bash
-# 去除调试信息，减小体积
-go build -ldflags="-s -w" -o secure-client
-
-# 使用upx压缩（可选）
-upx --best secure-client
+cd server
+go build -o license-server
 ```
 
-### 混淆保护（可选）
+2. **配置环境变量**
+```bash
+export PORT=8080              # 监听端口
+export DB_PATH=./licenses.db  # 数据库文件路径
+export JWT_SECRET=your-secret-key-here  # JWT密钥（重要！）
+```
 
-考虑使用Go混淆工具保护二进制文件：
-- [garble](https://github.com/burrowers/garble)
-- [gobfuscate](https://github.com/unixpickle/gobfuscate)
+3. **启动服务器**
+```bash
+./license-server
+```
+
+#### 方式二：Docker 部署（推荐用于生产）
+
+1. **创建 Dockerfile**
+```dockerfile
+FROM golang:1.21-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN cd server && go mod download
+RUN cd server && go build -ldflags="-s -w" -o license-server
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=builder /app/server/license-server .
+EXPOSE 8080
+CMD ["./license-server"]
+```
+
+2. **构建并运行**
+```bash
+docker build -t license-server:latest .
+docker run -d \
+  -p 8080:8080 \
+  -e JWT_SECRET=your-secret-key \
+  -v $(pwd)/data:/root/data \
+  --name license-server \
+  license-server:latest
+```
+
+#### 方式三：systemd 服务（Linux 服务器）
+
+1. **创建服务文件** `/etc/systemd/system/license-server.service`
+```ini
+[Unit]
+Description=License Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/license-server
+ExecStart=/opt/license-server/license-server
+Environment="PORT=8080"
+Environment="DB_PATH=/var/lib/license-server/licenses.db"
+Environment="JWT_SECRET=your-secret-key-here"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+2. **启动服务**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable license-server
+sudo systemctl start license-server
+sudo systemctl status license-server
+```
+
+#### 反向代理配置（Nginx + SSL）
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name license.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 🖥️ 客户端集成指南
+
+#### 集成到现有 EXE 程序的三种方式
+
+##### 方式一：作为独立进程（推荐 - 最简单）
+
+**原理**：你的主程序在启动时先调用验证程序，验证通过后才继续运行。
+
+1. **编译验证客户端**
+```bash
+# Windows 64位
+GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o drm-validator.exe
+
+# 压缩（可选）
+upx --best drm-validator.exe
+```
+
+2. **在你的程序中调用**（任何语言都可以）
+
+**C# 示例**：
+```csharp
+using System;
+using System.Diagnostics;
+
+class Program {
+    static void Main() {
+        // 调用验证程序
+        var process = new Process {
+            StartInfo = new ProcessStartInfo {
+                FileName = "drm-validator.exe",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0) {
+            Console.WriteLine("License validation failed!");
+            Environment.Exit(1);
+        }
+
+        // 验证通过，继续你的程序逻辑
+        Console.WriteLine("License valid! Starting main application...");
+        RunYourApp();
+    }
+}
+```
+
+**Python 示例**：
+```python
+import subprocess
+import sys
+
+# 调用验证程序
+result = subprocess.run(['drm-validator.exe'], capture_output=True)
+
+if result.returncode != 0:
+    print("License validation failed!")
+    sys.exit(1)
+
+# 验证通过
+print("License valid! Starting main application...")
+run_your_app()
+```
+
+**C++ 示例**：
+```cpp
+#include <windows.h>
+#include <iostream>
+
+int main() {
+    STARTUPINFO si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
+
+    if (!CreateProcess("drm-validator.exe", NULL, NULL, NULL, FALSE,
+                       0, NULL, NULL, &si, &pi)) {
+        std::cerr << "Failed to start validator" << std::endl;
+        return 1;
+    }
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    DWORD exitCode;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    if (exitCode != 0) {
+        std::cerr << "License validation failed!" << std::endl;
+        return 1;
+    }
+
+    // 验证通过
+    std::cout << "License valid! Starting main application..." << std::endl;
+    RunYourApp();
+    return 0;
+}
+```
+
+##### 方式二：作为 DLL/动态链接库
+
+1. **将 Go 代码编译为 C 兼容的 DLL**
+
+修改 `main.go`，导出 C 函数：
+```go
+package main
+
+import "C"
+import (
+    "github.com/Lazywords2006/web/auth"
+    "github.com/Lazywords2006/web/hwid"
+    "github.com/Lazywords2006/web/heartbeat"
+)
+
+var monitor *heartbeat.Monitor
+
+//export ValidateLicense
+func ValidateLicense(serverURL *C.char, licenseKey *C.char) C.int {
+    // 转换C字符串
+    url := C.GoString(serverURL)
+    key := C.GoString(licenseKey)
+
+    // 执行验证逻辑
+    client := auth.NewClient(url)
+    hwid, _ := hwid.GetHardwareID()
+
+    if err := client.Activate(key, hwid); err != nil {
+        return 0 // 失败
+    }
+
+    // 启动心跳
+    monitor = heartbeat.NewMonitor(client, 30, 3, 2)
+    go monitor.Start()
+
+    return 1 // 成功
+}
+
+//export StopValidation
+func StopValidation() {
+    if monitor != nil {
+        // 停止监控（需要添加Stop方法）
+    }
+}
+
+func main() {}
+```
+
+2. **编译为 DLL**
+```bash
+go build -buildmode=c-shared -o drm-validator.dll
+```
+
+3. **在你的程序中调用**
+
+**C# 示例**：
+```csharp
+using System.Runtime.InteropServices;
+
+class DRMValidator {
+    [DllImport("drm-validator.dll")]
+    private static extern int ValidateLicense(string serverURL, string licenseKey);
+
+    [DllImport("drm-validator.dll")]
+    private static extern void StopValidation();
+
+    public static bool Validate(string serverURL, string key) {
+        return ValidateLicense(serverURL, key) == 1;
+    }
+}
+
+// 使用
+if (!DRMValidator.Validate("https://license.yourdomain.com", "YOUR-KEY")) {
+    Console.WriteLine("License validation failed!");
+    Environment.Exit(1);
+}
+```
+
+##### 方式三：嵌入到主程序（最隐蔽）
+
+将验证程序作为资源嵌入到你的 EXE 中：
+
+1. **将 drm-validator.exe 转换为 Base64 或二进制资源**
+```bash
+# PowerShell
+$bytes = [System.IO.File]::ReadAllBytes("drm-validator.exe")
+[System.Convert]::ToBase64String($bytes) > validator.b64
+```
+
+2. **在运行时解压并执行**
+```csharp
+// 从资源中提取验证器
+byte[] validatorBytes = Convert.FromBase64String(Properties.Resources.ValidatorBase64);
+string tempPath = Path.Combine(Path.GetTempPath(), "drm-validator.exe");
+File.WriteAllBytes(tempPath, validatorBytes);
+
+// 执行验证
+var process = Process.Start(tempPath);
+process.WaitForExit();
+
+// 清理临时文件
+File.Delete(tempPath);
+
+if (process.ExitCode != 0) {
+    Environment.Exit(1);
+}
+```
+
+### 🔧 配置客户端
+
+在你的 EXE 同目录创建 `config.json`：
+```json
+{
+  "server_url": "https://license.yourdomain.com",
+  "license_key": "",
+  "heartbeat_interval_seconds": 300,
+  "max_retries": 3,
+  "retry_delay_seconds": 2
+}
+```
+
+或使用环境变量：
+```bash
+set LICENSE_SERVER=https://license.yourdomain.com
+set LICENSE_KEY=YOUR-KEY-HERE
+```
+
+### 🔐 安全加固（生产必须！）
+
+#### 1. 启用 SSL Pinning
+
+编辑 `auth/auth.go:35`：
+```go
+// 加载证书
+certPool := x509.NewCertPool()
+cert, _ := ioutil.ReadFile("server.crt")
+certPool.AppendCertsFromPEM(cert)
+
+Transport: &http.Transport{
+    TLSClientConfig: &tls.Config{
+        RootCAs:      certPool,
+        MinVersion:   tls.VersionTLS12,
+    },
+}
+```
+
+#### 2. 添加请求签名
+
+编辑 `auth/auth.go:67` 和 `:121`：
+```go
+import "crypto/hmac"
+import "crypto/sha256"
+
+func generateHMAC(data []byte, secret string) string {
+    h := hmac.New(sha256.New, []byte(secret))
+    h.Write(data)
+    return hex.EncodeToString(h.Sum(nil))
+}
+
+// 在发送请求前
+signature := generateHMAC(jsonData, "your-shared-secret")
+req.Header.Set("X-Request-Signature", signature)
+req.Header.Set("X-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
+```
+
+#### 3. 代码混淆
+
+```bash
+# 安装 garble
+go install mvdan.cc/garble@latest
+
+# 混淆编译
+garble -literals -tiny build -ldflags="-s -w" -o secure-client.exe
+```
+
+#### 4. 编译优化
+
+```bash
+# 最小化二进制
+go build -ldflags="-s -w" -o secure-client.exe
+
+# UPX 压缩
+upx --best --ultra-brute secure-client.exe
+```
+
+### 📊 管理许可证
+
+#### 使用 API 生成许可证
+
+```bash
+# 生成新许可证
+curl -X POST https://license.yourdomain.com/api/admin/license \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "CUSTOM-KEY-2024-001",
+    "max_devices": 3,
+    "expiry_date": "2025-12-31T23:59:59Z",
+    "note": "Customer: John Doe"
+  }'
+
+# 查询许可证
+curl "https://license.yourdomain.com/api/admin/license?key=CUSTOM-KEY-2024-001"
+
+# 获取统计
+curl "https://license.yourdomain.com/api/admin/stats"
+```
+
+#### 管理前端（可选）
+
+将前端文件放到 `server/frontend/` 目录，通过浏览器访问：
+```
+http://license.yourdomain.com/
+```
 
 ## 测试
 
