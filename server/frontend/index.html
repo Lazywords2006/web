@@ -284,10 +284,24 @@
             }
         }
 
-        .refresh-btn {
+        .header-actions {
             position: absolute;
             top: 20px;
             right: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .user-info {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .refresh-btn, .logout-btn {
             background: rgba(255, 255, 255, 0.2);
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.3);
@@ -297,8 +311,17 @@
             transition: all 0.3s;
         }
 
-        .refresh-btn:hover {
+        .refresh-btn:hover, .logout-btn:hover {
             background: rgba(255, 255, 255, 0.3);
+        }
+
+        .logout-btn {
+            background: rgba(255, 59, 48, 0.3);
+            border-color: rgba(255, 59, 48, 0.5);
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 59, 48, 0.5);
         }
 
         .modal {
@@ -348,9 +371,13 @@
 <body>
     <div class="container">
         <div class="header">
+            <div class="header-actions">
+                <span class="user-info">👤 <span id="username"></span></span>
+                <button class="refresh-btn" onclick="loadDashboard()">🔄 刷新数据</button>
+                <button class="logout-btn" onclick="logout()">🚪 退出登录</button>
+            </div>
             <h1>🔐 许可证管理系统</h1>
             <p>License Management System</p>
-            <button class="refresh-btn" onclick="loadDashboard()">🔄 刷新数据</button>
         </div>
 
         <!-- 统计仪表盘 -->
@@ -482,8 +509,46 @@
         // API 基础地址（自动检测）
         const API_BASE = window.location.origin;
 
+        // 检查登录状态
+        function checkAuth() {
+            const token = localStorage.getItem('admin_token');
+            const loginTime = localStorage.getItem('admin_login_time');
+            const username = localStorage.getItem('admin_username');
+
+            if (!token || !username) {
+                window.location.href = '/login.html';
+                return false;
+            }
+
+            // 检查是否超过24小时（可选）
+            if (loginTime && (Date.now() - parseInt(loginTime)) > 24 * 60 * 60 * 1000) {
+                alert('登录已过期，请重新登录');
+                logout();
+                return false;
+            }
+
+            // 显示用户名
+            document.getElementById('username').textContent = username;
+            return true;
+        }
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('admin_token');
+                localStorage.removeItem('admin_username');
+                localStorage.removeItem('admin_login_time');
+                window.location.href = '/login.html';
+            }
+        }
+
         // 初始化页面
         window.onload = function() {
+            // 检查登录状态
+            if (!checkAuth()) {
+                return;
+            }
+
             // 设置默认过期时间为一年后
             const nextYear = new Date();
             nextYear.setFullYear(nextYear.getFullYear() + 1);
