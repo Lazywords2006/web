@@ -17,7 +17,7 @@ import requests
 class LicenseActivator:
     def __init__(self):
         # 配置
-        self.server_url = "http://localhost:8080"
+        self.server_url = "http://106.14.255.49:8080"
         self.target_exe = "lzy_zte_12.10.exe"
         self.license_file = "license.dat"
 

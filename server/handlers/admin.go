@@ -222,23 +222,23 @@ func HandleListLicenses(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// 构建许可证对象
-		license := map[string]interface{}{
-			"id":            id,
-			"key":           licenseKey,
-			"license_key":   licenseKey,
-			"product_name":  productName,
-			"status":        status,
-			"max_devices":   maxDevices,
-			"validity_days": validityDays,
-		}
-
 		// 计算已激活设备数
 		activatedDevices := 0
 		if status == "active" && hwid.Valid && hwid.String != "" {
 			activatedDevices = 1
 		}
-		license["activated_devices"] = activatedDevices
+
+		// 构建许可证对象
+		license := map[string]interface{}{
+			"id":                id,
+			"key":               licenseKey,
+			"license_key":       licenseKey,
+			"product_name":      productName,
+			"status":            status,
+			"max_devices":       maxDevices,
+			"validity_days":     validityDays,
+			"activated_devices": activatedDevices,
+		}
 
 		if hwid.Valid {
 			license["hwid"] = hwid.String

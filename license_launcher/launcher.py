@@ -26,7 +26,7 @@ except ImportError:
 
 # 全局配置
 CONFIG = {
-    'server_url': 'http://localhost:8080',
+    'server_url': 'http://106.14.255.49:8080',
     'target_exe': '',  # 留空表示仅验证许可证，不启动程序
     'license_file': 'license.dat',
     'use_gui': 'auto',  # 'auto', 'force_gui', 'force_cli'

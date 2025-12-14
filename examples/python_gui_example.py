@@ -36,7 +36,7 @@ class LicenseApp:
         self.root.resizable(False, False)
 
         # 服务器配置
-        self.server_url = "http://localhost:8080"
+        self.server_url = "http://106.14.255.49:8080"
         self.token = None
         self.license_key = None
         self.hwid = self.get_hardware_id()

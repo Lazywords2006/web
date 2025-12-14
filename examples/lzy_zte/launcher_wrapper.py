@@ -38,7 +38,7 @@ import requests
 class LicenseLauncher:
     def __init__(self):
         # 配置
-        self.server_url = "http://localhost:8080"
+        self.server_url = "http://106.14.255.49:8080"
         self.target_exe = "lzy_zte_12.10.exe"  # 要启动的目标程序
         self.license_file = "license.dat"  # 保存许可证信息的文件
 
