@@ -425,8 +425,8 @@
                     <input type="number" id="create-max-devices" value="3" min="1">
                 </div>
                 <div class="form-group">
-                    <label>过期时间 *</label>
-                    <input type="datetime-local" id="create-expiry">
+                    <label>有效期 (天) *</label>
+                    <input type="number" id="create-validity-days" value="365" min="1" placeholder="例如: 365 表示一年">
                 </div>
                 <div class="form-group">
                     <label>备注</label>
@@ -434,6 +434,33 @@
                 </div>
                 <button class="btn" onclick="createLicense()">生成许可证</button>
                 <div id="create-result"></div>
+            </div>
+
+            <!-- 批量生成许可证 -->
+            <div class="card">
+                <h2>🎯 批量生成许可证</h2>
+                <div class="form-group">
+                    <label>生成数量 *</label>
+                    <input type="number" id="batch-count" value="10" min="1" max="1000" placeholder="1-1000">
+                </div>
+                <div class="form-group">
+                    <label>密钥前缀</label>
+                    <input type="text" id="batch-prefix" value="LICENSE" placeholder="默认: LICENSE">
+                </div>
+                <div class="form-group">
+                    <label>最大设备数 *</label>
+                    <input type="number" id="batch-max-devices" value="3" min="1">
+                </div>
+                <div class="form-group">
+                    <label>有效期 (天) *</label>
+                    <input type="number" id="batch-validity-days" value="365" min="1">
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="batch-note" rows="3" placeholder="批次说明"></textarea>
+                </div>
+                <button class="btn" onclick="batchGenerateLicense()">批量生成</button>
+                <div id="batch-result"></div>
             </div>
 
             <!-- 查询许可证 -->
@@ -481,6 +508,8 @@
             <div class="search-bar">
                 <input type="text" id="search-filter" placeholder="搜索许可证密钥、备注..." oninput="filterLicenses()">
                 <button class="btn" onclick="loadAllLicenses()" style="width: auto; padding: 10px 20px;">刷新列表</button>
+                <button class="btn btn-success" onclick="exportLicenses()" style="width: auto; padding: 10px 20px;">📥 导出许可证</button>
+                <button class="btn btn-danger" onclick="batchDeleteLicenses()" style="width: auto; padding: 10px 20px;">🗑️ 批量删除</button>
             </div>
             <div id="licenses-list">
                 <div class="loading">正在加载...</div>
@@ -541,11 +570,6 @@
                 return;
             }
 
-            // 设置默认过期时间为一年后
-            const nextYear = new Date();
-            nextYear.setFullYear(nextYear.getFullYear() + 1);
-            document.getElementById('create-expiry').value = formatDateTimeLocal(nextYear);
-
             // 加载数据
             loadDashboard();
             loadAllLicenses();
@@ -592,10 +616,10 @@
         async function createLicense() {
             const key = document.getElementById('create-key').value;
             const maxDevices = document.getElementById('create-max-devices').value;
-            const expiry = document.getElementById('create-expiry').value;
+            const validityDays = document.getElementById('create-validity-days').value;
             const note = document.getElementById('create-note').value;
 
-            if (!key || !maxDevices || !expiry) {
+            if (!key || !maxDevices || !validityDays) {
                 showResult('create-result', '请填写所有必填字段', 'error');
                 return;
             }
@@ -603,7 +627,7 @@
             const data = {
                 key: key,
                 max_devices: parseInt(maxDevices),
-                expiry_date: new Date(expiry).toISOString(),
+                validity_days: parseInt(validityDays),
                 note: note
             };
 
@@ -617,7 +641,7 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    showResult('create-result', '许可证创建成功！\n' + JSON.stringify(result, null, 2), 'success');
+                    showResult('create-result', `许可证创建成功！\n密钥: ${result.license_key}\n有效期: ${result.validity_days} 天\n最大设备数: ${result.max_devices}\n\n激活后将从激活时间开始计算过期时间`, 'success');
                     // 清空表单
                     document.getElementById('create-key').value = '';
                     document.getElementById('create-note').value = '';
@@ -652,6 +676,75 @@
                 }
             } catch (error) {
                 showResult('query-result', '请求失败: ' + error.message, 'error');
+            }
+        }
+
+        // 批量生成许可证
+        async function batchGenerateLicense() {
+            const count = document.getElementById('batch-count').value;
+            const prefix = document.getElementById('batch-prefix').value;
+            const maxDevices = document.getElementById('batch-max-devices').value;
+            const validityDays = document.getElementById('batch-validity-days').value;
+            const note = document.getElementById('batch-note').value;
+
+            if (!count || !maxDevices || !validityDays) {
+                showResult('batch-result', '请填写所有必填字段', 'error');
+                return;
+            }
+
+            if (parseInt(count) <= 0 || parseInt(count) > 1000) {
+                showResult('batch-result', '生成数量必须在 1-1000 之间', 'error');
+                return;
+            }
+
+            if (!confirm(`确定要批量生成 ${count} 个许可证吗？`)) {
+                return;
+            }
+
+            const data = {
+                count: parseInt(count),
+                prefix: prefix,
+                max_devices: parseInt(maxDevices),
+                validity_days: parseInt(validityDays),
+                note: note
+            };
+
+            try {
+                showResult('batch-result', '正在生成许可证,请稍候...', 'success');
+
+                const response = await fetch(`${API_BASE}/api/admin/licenses/batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    let message = `批量生成完成！\n\n`;
+                    message += `✅ 成功: ${result.success} 个\n`;
+                    message += `❌ 失败: ${result.failed} 个\n`;
+                    message += `📊 总计: ${result.total} 个\n\n`;
+                    message += `生成的密钥列表:\n`;
+                    message += `────────────────────────────\n`;
+                    result.licenses.forEach((lic, idx) => {
+                        message += `${idx + 1}. ${lic.license_key}\n`;
+                    });
+
+                    showResult('batch-result', message, 'success');
+
+                    // 清空表单(数量重置为10)
+                    document.getElementById('batch-count').value = '10';
+                    document.getElementById('batch-note').value = '';
+
+                    // 刷新数据
+                    loadDashboard();
+                    loadAllLicenses();
+                } else {
+                    showResult('batch-result', '批量生成失败: ' + (result.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                showResult('batch-result', '请求失败: ' + error.message, 'error');
             }
         }
 
@@ -725,10 +818,11 @@
 
             let html = '<table class="license-table">';
             html += '<thead><tr>';
+            html += '<th><input type="checkbox" id="select-all" onchange="toggleSelectAll()"></th>';
             html += '<th>许可证密钥</th>';
             html += '<th>状态</th>';
             html += '<th>设备数</th>';
-            html += '<th>过期时间</th>';
+            html += '<th>过期信息</th>';
             html += '<th>备注</th>';
             html += '<th>操作</th>';
             html += '</tr></thead><tbody>';
@@ -739,24 +833,30 @@
                 const maxDevices = license.max_devices || 1;
                 const activatedDevices = license.activated_devices || 0;
                 const note = license.note || '-';
+                const status = license.status || 'unused';
+                const validityDays = license.validity_days;
 
-                // 格式化过期时间，兼容不同的字段名
-                let expiryDate = '-';
-                const dateField = license.expiry_date || license.expires_at;
-                if (dateField) {
-                    try {
-                        const date = new Date(dateField);
-                        if (!isNaN(date.getTime())) {
-                            expiryDate = date.toLocaleString('zh-CN', {
-                                year: 'numeric',
-                                month: '2-digit',
-                                day: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            });
+                // 格式化过期信息 - 未激活显示有效期天数,已激活显示过期时间
+                let expiryInfo = '-';
+                if (status === 'unused' && validityDays) {
+                    expiryInfo = `有效期 ${validityDays} 天`;
+                } else {
+                    const dateField = license.expiry_date || license.expires_at;
+                    if (dateField) {
+                        try {
+                            const date = new Date(dateField);
+                            if (!isNaN(date.getTime())) {
+                                expiryInfo = date.toLocaleString('zh-CN', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+                            }
+                        } catch (e) {
+                            console.error('日期格式化错误:', e);
                         }
-                    } catch (e) {
-                        console.error('日期格式化错误:', e);
                     }
                 }
 
@@ -764,10 +864,11 @@
                 const statusText = getStatusText(license);
 
                 html += '<tr>';
+                html += `<td><input type="checkbox" class="license-checkbox" value="${key}"></td>`;
                 html += `<td><strong>${key}</strong></td>`;
                 html += `<td><span class="status-badge ${statusClass}">${statusText}</span></td>`;
                 html += `<td>${activatedDevices} / ${maxDevices}</td>`;
-                html += `<td>${expiryDate}</td>`;
+                html += `<td>${expiryInfo}</td>`;
                 html += `<td>${note}</td>`;
                 html += `<td class="action-buttons">`;
                 html += `<button class="btn btn-small btn-secondary" onclick='viewDetails(${JSON.stringify(license).replace(/'/g, "\\'")}))'>详情</button>`;
@@ -959,6 +1060,128 @@
             } catch (error) {
                 alert('请求失败: ' + error.message);
             }
+        }
+
+        // 全选/取消全选
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('select-all');
+            const checkboxes = document.querySelectorAll('.license-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+
+        // 获取选中的许可证密钥
+        function getSelectedLicenses() {
+            const checkboxes = document.querySelectorAll('.license-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // 批量导出许可证
+        function exportLicenses() {
+            const selected = getSelectedLicenses();
+
+            // 如果没有选中,导出所有
+            const licensesToExport = selected.length > 0 ?
+                allLicenses.filter(lic => selected.includes(lic.key || lic.license_key)) :
+                allLicenses;
+
+            if (licensesToExport.length === 0) {
+                alert('没有可导出的许可证');
+                return;
+            }
+
+            // 准备CSV数据
+            let csv = '\uFEFF'; // UTF-8 BOM
+            csv += '许可证密钥,状态,产品名称,最大设备数,有效期(天),过期时间,激活时间,创建时间,备注\n';
+
+            licensesToExport.forEach(license => {
+                const key = license.key || license.license_key || '';
+                const status = license.status || '';
+                const productName = license.product_name || '';
+                const maxDevices = license.max_devices || '';
+                const validityDays = license.validity_days || '';
+                const expiresAt = license.expires_at || license.expiry_date || '';
+                const activatedAt = license.activated_at || '';
+                const createdAt = license.created_at || '';
+                const note = (license.note || '').replace(/"/g, '""'); // 转义双引号
+
+                csv += `"${key}","${status}","${productName}",${maxDevices},${validityDays},"${expiresAt}","${activatedAt}","${createdAt}","${note}"\n`;
+            });
+
+            // 创建下载链接
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+
+            link.setAttribute('href', url);
+            link.setAttribute('download', `licenses_${timestamp}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            alert(`成功导出 ${licensesToExport.length} 个许可证！\n文件已保存为: licenses_${timestamp}.csv`);
+        }
+
+        // 批量删除许可证
+        async function batchDeleteLicenses() {
+            const selected = getSelectedLicenses();
+
+            if (selected.length === 0) {
+                alert('请先选择要删除的许可证');
+                return;
+            }
+
+            if (!confirm(`⚠️ 警告：确定要删除选中的 ${selected.length} 个许可证吗？\n\n此操作不可恢复！`)) {
+                return;
+            }
+
+            // 二次确认
+            if (!confirm(`请再次确认批量删除 ${selected.length} 个许可证`)) {
+                return;
+            }
+
+            let successCount = 0;
+            let failCount = 0;
+            const failedKeys = [];
+
+            // 显示进度
+            const progressMsg = `正在删除 ${selected.length} 个许可证，请稍候...`;
+            alert(progressMsg);
+
+            for (const key of selected) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/admin/license?key=${encodeURIComponent(key)}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        failedKeys.push(key);
+                    }
+                } catch (error) {
+                    failCount++;
+                    failedKeys.push(key);
+                }
+            }
+
+            // 显示结果
+            let message = `批量删除完成！\n\n`;
+            message += `✅ 成功: ${successCount} 个\n`;
+            message += `❌ 失败: ${failCount} 个\n`;
+
+            if (failedKeys.length > 0) {
+                message += `\n失败的许可证:\n`;
+                message += failedKeys.join('\n');
+            }
+
+            alert(message);
+
+            // 刷新列表
+            loadDashboard();
+            loadAllLicenses();
         }
 
         // 显示结果

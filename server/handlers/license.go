@@ -44,14 +44,28 @@ func HandleActivate(w http.ResponseWriter, r *http.Request) {
 
 	// 查询许可证
 	var license models.License
+	var validityDays int
+	var expiresAt sql.NullTime
+	var hwid sql.NullString
+	var userID sql.NullInt64
+
 	err := database.DB.QueryRow(`
-		SELECT id, license_key, product_name, hwid, status, max_devices, expires_at, user_id
+		SELECT id, license_key, product_name, hwid, status, max_devices, validity_days, expires_at, user_id
 		FROM licenses WHERE license_key = ?
 	`, req.Key).Scan(
 		&license.ID, &license.LicenseKey, &license.ProductName,
-		&license.HWID, &license.Status, &license.MaxDevices,
-		&license.ExpiresAt, &license.UserID,
+		&hwid, &license.Status, &license.MaxDevices,
+		&validityDays, &expiresAt, &userID,
 	)
+
+	// 处理 NULL hwid
+	if hwid.Valid {
+		license.HWID = hwid.String
+	}
+	// 处理 NULL user_id
+	if userID.Valid {
+		license.UserID = userID.Int64
+	}
 
 	if err == sql.ErrNoRows {
 		log.Printf("[Activate] REJECTED: License not found")
@@ -65,6 +79,11 @@ func HandleActivate(w http.ResponseWriter, r *http.Request) {
 		logActivation(req.Key, req.HWID, "activate", r, false, "Database error")
 		respondError(w, "Internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// 如果已有过期时间,使用它;否则在激活时计算
+	if expiresAt.Valid {
+		license.ExpiresAt = expiresAt.Time
 	}
 
 	// 验证许可证状态
@@ -82,8 +101,8 @@ func HandleActivate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 检查过期时间
-	if time.Now().After(license.ExpiresAt) {
+	// 检查过期时间 (只有已激活且设置了expires_at的才检查)
+	if expiresAt.Valid && time.Now().After(license.ExpiresAt) {
 		// 更新状态为expired
 		database.DB.Exec("UPDATE licenses SET status = 'expired' WHERE id = ?", license.ID)
 		log.Printf("[Activate] REJECTED: License expired (expires_at check)")
@@ -102,13 +121,18 @@ func HandleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 激活许可证
+	// 激活许可证 (首次激活)
 	if license.Status == "unused" {
+		// 计算过期时间: 当前时间 + validity_days 天
+		now := time.Now()
+		expiresAt := now.AddDate(0, 0, validityDays)
+		license.ExpiresAt = expiresAt
+
 		_, err = database.DB.Exec(`
 			UPDATE licenses
-			SET hwid = ?, status = 'active', activated_at = ?, updated_at = ?
+			SET hwid = ?, status = 'active', activated_at = ?, expires_at = ?, updated_at = ?
 			WHERE id = ?
-		`, req.HWID, time.Now(), time.Now(), license.ID)
+		`, req.HWID, now, expiresAt, now, license.ID)
 
 		if err != nil {
 			log.Printf("[Activate] ERROR: Failed to update license: %v", err)
@@ -117,7 +141,7 @@ func HandleActivate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Printf("[Activate] License activated successfully")
+		log.Printf("[Activate] License activated successfully, expires_at=%s (%d days)", expiresAt.Format("2006-01-02"), validityDays)
 	} else {
 		// 已激活，验证HWID
 		log.Printf("[Activate] License already active, validating HWID")

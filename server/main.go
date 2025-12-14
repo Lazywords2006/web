@@ -57,6 +57,7 @@ func setupRoutes() {
 	// 管理API
 	http.HandleFunc("/api/admin/license", corsMiddleware(adminRouteHandler))
 	http.HandleFunc("/api/admin/licenses", corsMiddleware(handlers.HandleListLicenses))
+	http.HandleFunc("/api/admin/licenses/batch", corsMiddleware(handlers.HandleBatchGenerateLicense))
 	http.HandleFunc("/api/admin/stats", corsMiddleware(handlers.HandleGetStats))
 
 	// 静态文件服务（前端界面）

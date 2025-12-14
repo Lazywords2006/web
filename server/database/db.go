@@ -68,6 +68,7 @@ func createTables() error {
 		hwid TEXT,
 		status TEXT DEFAULT 'unused',
 		max_devices INTEGER DEFAULT 1,
+		validity_days INTEGER DEFAULT 365,
 		expires_at DATETIME,
 		activated_at DATETIME,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -75,6 +76,7 @@ func createTables() error {
 		user_id INTEGER,
 		order_id TEXT,
 		last_heartbeat DATETIME,
+		note TEXT,
 		FOREIGN KEY (user_id) REFERENCES users(id)
 	);
 

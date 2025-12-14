@@ -22,10 +22,11 @@ func HandleGenerateLicense(w http.ResponseWriter, r *http.Request) {
 	// TODO: 添加管理员认证中间件
 
 	var req struct {
-		ProductName string `json:"product_name"`
-		Duration    int    `json:"duration"` // 天数
-		MaxDevices  int    `json:"max_devices"`
-		UserID      int64  `json:"user_id,omitempty"`
+		Key          string `json:"key"`           // 许可证密钥
+		MaxDevices   int    `json:"max_devices"`   // 最大设备数
+		ValidityDays int    `json:"validity_days"` // 有效期天数
+		Note         string `json:"note"`          // 备注
+		ProductName  string `json:"product_name"`  // 产品名称(可选)
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -33,22 +34,29 @@ func HandleGenerateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 生成许可证密钥
-	licenseKey, err := utils.GenerateLicenseKey()
-	if err != nil {
-		log.Printf("[Admin] Failed to generate license key: %v", err)
-		respondError(w, "Failed to generate license", http.StatusInternalServerError)
+	// 验证必填字段
+	if req.Key == "" {
+		respondError(w, "License key is required", http.StatusBadRequest)
 		return
 	}
 
-	// 计算过期时间
-	expiresAt := time.Now().AddDate(0, 0, req.Duration)
+	if req.MaxDevices <= 0 {
+		req.MaxDevices = 1
+	}
 
-	// 插入数据库
-	_, err = database.DB.Exec(`
-		INSERT INTO licenses (license_key, product_name, status, max_devices, expires_at, user_id)
+	if req.ValidityDays <= 0 {
+		req.ValidityDays = 365 // 默认1年
+	}
+
+	if req.ProductName == "" {
+		req.ProductName = "Default Product"
+	}
+
+	// 插入数据库 (不设置 expires_at,等激活时再计算)
+	_, err := database.DB.Exec(`
+		INSERT INTO licenses (license_key, product_name, status, max_devices, validity_days, note)
 		VALUES (?, ?, 'unused', ?, ?, ?)
-	`, licenseKey, req.ProductName, req.MaxDevices, expiresAt, req.UserID)
+	`, req.Key, req.ProductName, req.MaxDevices, req.ValidityDays, req.Note)
 
 	if err != nil {
 		log.Printf("[Admin] Failed to insert license: %v", err)
@@ -56,13 +64,104 @@ func HandleGenerateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Admin] Generated license: %s for product %s", licenseKey, req.ProductName)
+	log.Printf("[Admin] Generated license: %s (validity: %d days)", req.Key, req.ValidityDays)
 
 	respondJSON(w, map[string]interface{}{
-		"license_key":  licenseKey,
-		"product_name": req.ProductName,
-		"expires_at":   expiresAt,
-		"max_devices":  req.MaxDevices,
+		"license_key":   req.Key,
+		"product_name":  req.ProductName,
+		"validity_days": req.ValidityDays,
+		"max_devices":   req.MaxDevices,
+		"note":          req.Note,
+		"status":        "unused",
+	}, http.StatusOK)
+}
+
+// HandleBatchGenerateLicense 批量生成许可证
+func HandleBatchGenerateLicense(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Count        int    `json:"count"`         // 生成数量
+		Prefix       string `json:"prefix"`        // 密钥前缀
+		MaxDevices   int    `json:"max_devices"`   // 最大设备数
+		ValidityDays int    `json:"validity_days"` // 有效期天数
+		Note         string `json:"note"`          // 备注
+		ProductName  string `json:"product_name"`  // 产品名称
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// 验证参数
+	if req.Count <= 0 || req.Count > 1000 {
+		respondError(w, "Count must be between 1 and 1000", http.StatusBadRequest)
+		return
+	}
+
+	if req.MaxDevices <= 0 {
+		req.MaxDevices = 1
+	}
+
+	if req.ValidityDays <= 0 {
+		req.ValidityDays = 365
+	}
+
+	if req.ProductName == "" {
+		req.ProductName = "Default Product"
+	}
+
+	if req.Prefix == "" {
+		req.Prefix = "LICENSE"
+	}
+
+	// 生成许可证
+	generated := []map[string]interface{}{}
+	failed := 0
+
+	for i := 0; i < req.Count; i++ {
+		// 生成唯一密钥
+		key, err := utils.GenerateLicenseKey()
+		if err != nil {
+			failed++
+			continue
+		}
+
+		// 添加前缀
+		if req.Prefix != "" && req.Prefix != "LICENSE" {
+			key = req.Prefix + "-" + key[8:] // 替换默认前缀
+		}
+
+		// 插入数据库
+		_, err = database.DB.Exec(`
+			INSERT INTO licenses (license_key, product_name, status, max_devices, validity_days, note)
+			VALUES (?, ?, 'unused', ?, ?, ?)
+		`, key, req.ProductName, req.MaxDevices, req.ValidityDays, req.Note)
+
+		if err != nil {
+			log.Printf("[Admin] Failed to insert batch license: %v", err)
+			failed++
+			continue
+		}
+
+		generated = append(generated, map[string]interface{}{
+			"license_key": key,
+		})
+	}
+
+	log.Printf("[Admin] Batch generated %d licenses (failed: %d)", len(generated), failed)
+
+	respondJSON(w, map[string]interface{}{
+		"success":       len(generated),
+		"failed":        failed,
+		"total":         req.Count,
+		"licenses":      generated,
+		"max_devices":   req.MaxDevices,
+		"validity_days": req.ValidityDays,
 	}, http.StatusOK)
 }
 
@@ -79,7 +178,7 @@ func HandleListLicenses(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	userID := r.URL.Query().Get("user_id")
 
-	query := "SELECT id, license_key, product_name, hwid, status, max_devices, expires_at, activated_at, created_at, updated_at, user_id, last_heartbeat FROM licenses WHERE 1=1"
+	query := "SELECT id, license_key, product_name, hwid, status, max_devices, validity_days, expires_at, activated_at, created_at, updated_at, user_id, last_heartbeat, note FROM licenses WHERE 1=1"
 	args := []interface{}{}
 
 	if status != "" {
@@ -102,17 +201,20 @@ func HandleListLicenses(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	licenses := []models.License{}
+	licenses := []map[string]interface{}{}
 	for rows.Next() {
-		var license models.License
-		var hwid, lastHeartbeat sql.NullString
-		var activatedAt sql.NullTime
+		var id int
+		var licenseKey, productName, status string
+		var maxDevices, validityDays int
+		var hwid, note, lastHeartbeat sql.NullString
+		var expiresAt, activatedAt, createdAt, updatedAt sql.NullTime
+		var userID sql.NullInt64
 
 		err := rows.Scan(
-			&license.ID, &license.LicenseKey, &license.ProductName,
-			&hwid, &license.Status, &license.MaxDevices,
-			&license.ExpiresAt, &activatedAt, &license.CreatedAt, &license.UpdatedAt,
-			&license.UserID, &lastHeartbeat,
+			&id, &licenseKey, &productName,
+			&hwid, &status, &maxDevices, &validityDays,
+			&expiresAt, &activatedAt, &createdAt, &updatedAt,
+			&userID, &lastHeartbeat, &note,
 		)
 
 		if err != nil {
@@ -120,11 +222,50 @@ func HandleListLicenses(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// 构建许可证对象
+		license := map[string]interface{}{
+			"id":            id,
+			"key":           licenseKey,
+			"license_key":   licenseKey,
+			"product_name":  productName,
+			"status":        status,
+			"max_devices":   maxDevices,
+			"validity_days": validityDays,
+		}
+
+		// 计算已激活设备数
+		activatedDevices := 0
+		if status == "active" && hwid.Valid && hwid.String != "" {
+			activatedDevices = 1
+		}
+		license["activated_devices"] = activatedDevices
+
 		if hwid.Valid {
-			license.HWID = hwid.String
+			license["hwid"] = hwid.String
+		}
+		if note.Valid {
+			license["note"] = note.String
+		} else {
+			license["note"] = ""
+		}
+		if expiresAt.Valid {
+			license["expires_at"] = expiresAt.Time
+			license["expiry_date"] = expiresAt.Time
 		}
 		if activatedAt.Valid {
-			license.ActivatedAt = activatedAt.Time
+			license["activated_at"] = activatedAt.Time
+		}
+		if createdAt.Valid {
+			license["created_at"] = createdAt.Time
+		}
+		if updatedAt.Valid {
+			license["updated_at"] = updatedAt.Time
+		}
+		if userID.Valid {
+			license["user_id"] = userID.Int64
+		}
+		if lastHeartbeat.Valid {
+			license["last_heartbeat"] = lastHeartbeat.String
 		}
 
 		licenses = append(licenses, license)

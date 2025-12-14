@@ -1,138 +1,196 @@
-# Secure Always-Online Client (Go DRM System)
+# 许可证管理系统 (License Management System)
 
-一个使用Go语言实现的健壮的"永久在线"客户端应用程序包装器，具有DRM（数字版权管理）和网络安全功能。
+一个基于 Go 语言实现的完整许可证管理系统,包含服务器端 API、Web 管理界面和客户端 SDK。
 
-## 功能特性
+## ✨ 核心特性
 
-### 核心功能
-- ✅ **跨平台硬件ID生成**：支持 Windows、Linux、macOS
-- ✅ **许可证激活系统**：与远程服务器进行密钥验证
-- ✅ **持久心跳监控**：后台Goroutine维持连接验证
-- ✅ **智能重试机制**：3次重试，2秒延迟
-- ✅ **强制终止开关**：验证失败时立即终止应用
-- ✅ **模块化架构**：清晰的代码组织结构
+### 服务器端
+- ✅ **许可证生成与管理**: 支持单个/批量生成许可证
+- ✅ **激活时计算过期**: 许可证在首次激活时才计算过期时间
+- ✅ **硬件绑定**: 防止许可证在多台设备上使用
+- ✅ **心跳验证**: 实时监控许可证状态
+- ✅ **Web 管理界面**: 可视化管理所有许可证
+- ✅ **批量操作**: 一次生成多个许可证密钥
+- ✅ **SQLite 数据库**: 轻量级、无需额外配置
+
+### 客户端
+- ✅ **跨平台硬件ID**: 支持 Windows、Linux、macOS
+- ✅ **自动激活**: 一键完成许可证激活
+- ✅ **后台心跳**: 自动维持许可证验证状态
+- ✅ **强制退出**: 许可证失效时自动终止应用
 
 ### 安全特性
-- 🔒 基于JWT令牌的认证
-- 🔒 硬件绑定防止许可证共享
-- 🔒 预留SSL Pinning接口（生产环境推荐）
-- 🔒 请求签名和时间戳验证（TODO注释标注）
+- 🔒 基于 JWT 的认证机制
+- 🔒 硬件绑定防止密钥共享
+- 🔒 过期时间自动验证
+- 🔒 封禁功能支持
 
-## 项目结构
+---
+
+## 📁 项目结构
 
 ```
 网络验证/
-├── main.go                 # 主程序入口
-├── go.mod                  # Go模块定义
-├── config.json.example     # 配置文件示例
-├── auth/
-│   └── auth.go            # 许可证激活和验证逻辑
-├── hwid/
-│   └── hwid.go            # 跨平台硬件ID生成
-└── heartbeat/
-    └── heartbeat.go       # 心跳监控和强制退出机制
+├── server/                    # 服务器端
+│   ├── main.go               # 服务器主程序
+│   ├── handlers/             # API 处理器
+│   │   ├── license.go        # 许可证激活/心跳
+│   │   └── admin.go          # 管理 API
+│   ├── database/             # 数据库操作
+│   │   └── db.go             # SQLite 初始化
+│   ├── models/               # 数据模型
+│   │   └── models.go
+│   ├── utils/                # 工具函数
+│   │   └── utils.go
+│   ├── frontend/             # Web 管理界面
+│   │   ├── login.html        # 登录页面
+│   │   ├── index.html        # 管理后台
+│   │   └── test.html         # API 测试页面
+│   └── licenses.db           # SQLite 数据库
+│
+├── client/                    # 客户端SDK
+│   ├── main.go               # 客户端主程序
+│   ├── auth/                 # 认证模块
+│   │   └── auth.go
+│   ├── hwid/                 # 硬件ID生成
+│   │   └── hwid.go
+│   └── heartbeat/            # 心跳监控
+│       └── heartbeat.go
+│
+├── 快速集成.sh                # 一键集成脚本
+├── 集成指南.md                # 详细集成文档
+├── 集成快速参考.md             # 快速参考手册
+└── 示例项目.md                # 代码示例
 ```
 
-## 快速开始
+---
 
-### 1. 环境要求
+## 🚀 快速开始
 
-- Go 1.21 或更高版本
-- 网络连接到许可证服务器
-
-### 2. 安装依赖
+### 方式 1: 独立部署服务器
 
 ```bash
-go mod download
+# 1. 进入服务器目录
+cd server
+
+# 2. 安装依赖
+go mod tidy
+
+# 3. 编译
+go build -o server main.go
+
+# 4. 运行
+./server
 ```
 
-### 3. 配置
-
-复制配置文件示例：
+### 方式 2: 一键集成到你的项目
 
 ```bash
-cp config.json.example config.json
+# 集成到你的 Go 项目
+./快速集成.sh /path/to/your/project
 ```
 
-编辑 `config.json`：
+### 方式 3: 仅使用 API (跨语言)
 
-```json
-{
-  "server_url": "http://your-license-server.com",
-  "license_key": "YOUR-LICENSE-KEY-HERE",
-  "heartbeat_interval_seconds": 30,
-  "max_retries": 3,
-  "retry_delay_seconds": 2
-}
+服务器独立运行,任何语言通过 HTTP API 调用:
+
+```python
+# Python 示例
+import requests
+response = requests.post(
+    "http://localhost:8080/api/activate",
+    json={"key": "LICENSE-2025-XXX", "hwid": "device-id"}
+)
 ```
 
-**配置说明：**
-- `server_url`: 许可证服务器地址
-- `license_key`: 许可证密钥（可留空，运行时输入）
-- `heartbeat_interval_seconds`: 心跳间隔（秒）
-- `max_retries`: 心跳失败最大重试次数
-- `retry_delay_seconds`: 重试延迟（秒）
+详细集成方式请参考: [集成到EXE的完整指南.md](./docs/集成到EXE的完整指南.md)
 
-### 4. 编译
+---
+
+## 🎯 核心功能
+
+### 1. 许可证生成 (新版逻辑)
+
+#### 特点:
+- **按有效期天数设置**: 生成时只设置 `validity_days` (如 365天)
+- **激活时计算过期**: 首次激活时计算 `expires_at = 激活时间 + validity_days`
+- **灵活管理**: 未激活的许可证没有固定过期日期
+
+#### API: 生成单个许可证
 
 ```bash
-# 编译当前平台
-go build -o secure-client
-
-# 跨平台编译示例
-# Windows
-GOOS=windows GOARCH=amd64 go build -o secure-client.exe
-
-# Linux
-GOOS=linux GOARCH=amd64 go build -o secure-client-linux
-
-# macOS
-GOOS=darwin GOARCH=amd64 go build -o secure-client-mac
-```
-
-### 5. 运行
-
-```bash
-./secure-client
-```
-
-## 架构与逻辑流程
-
-### 启动流程
-
-```
-1. 加载配置 → 2. 生成HWID → 3. 激活许可证 → 4. 启动心跳 → 5. 运行业务逻辑
-```
-
-#### 1️⃣ 启动阶段（Startup）
-- 生成稳定的硬件ID（HWID）基于 CPU/磁盘/主板
-- 从配置文件或用户输入获取许可证密钥
-- 发送 `POST /api/activate` 请求：`{key, hwid}`
-- 接收并存储JWT令牌
-
-#### 2️⃣ 运行阶段（Runtime - Heartbeat）
-- 后台Goroutine每30秒发送 `POST /api/heartbeat`
-- **重试逻辑**：失败时重试3次，间隔2秒
-- **Kill Switch**：所有重试失败或服务器返回"Banned/Expired"时，调用 `ForceExit()` 立即终止进程
-
-#### 3️⃣ 业务逻辑（Business Logic）
-- 只有激活成功后才执行 `RunMainApp()` 函数
-- 这是实际软件功能的占位符
-
-### API 接口契约（Mock）
-
-#### 激活接口
-```http
-POST http://localhost:8080/api/activate
+POST /api/admin/license
 Content-Type: application/json
 
 {
-  "key": "LICENSE-KEY-HERE",
-  "hwid": "abc123..."
+  "key": "LICENSE-2025-XXX",
+  "max_devices": 3,
+  "validity_days": 365,
+  "note": "客户备注"
 }
 ```
 
-**成功响应 (200):**
+**响应:**
+```json
+{
+  "license_key": "LICENSE-2025-XXX",
+  "max_devices": 3,
+  "validity_days": 365,
+  "note": "客户备注",
+  "status": "unused"
+}
+```
+
+### 2. 批量生成许可证 (新功能)
+
+```bash
+POST /api/admin/licenses/batch
+Content-Type: application/json
+
+{
+  "count": 10,
+  "prefix": "BATCH",
+  "max_devices": 2,
+  "validity_days": 180,
+  "note": "批量测试"
+}
+```
+
+**响应:**
+```json
+{
+  "success": 10,
+  "failed": 0,
+  "total": 10,
+  "licenses": [
+    {"license_key": "BATCH-C-1927-2BAC-0876"},
+    {"license_key": "BATCH-6-21FE-6F8C-BBCF"},
+    ...
+  ],
+  "max_devices": 2,
+  "validity_days": 180
+}
+```
+
+### 3. 许可证激活
+
+```bash
+POST /api/activate
+Content-Type: application/json
+
+{
+  "key": "LICENSE-2025-XXX",
+  "hwid": "device-hardware-id"
+}
+```
+
+**首次激活时:**
+1. 验证许可证是否有效
+2. 计算过期时间: `expires_at = now() + validity_days`
+3. 绑定硬件ID
+4. 返回 JWT token
+
+**响应:**
 ```json
 {
   "status": "success",
@@ -140,613 +198,488 @@ Content-Type: application/json
 }
 ```
 
-**失败响应 (403):**
-```json
+### 4. 心跳验证
+
+```bash
+POST /api/heartbeat
+Authorization: Bearer <token>
+
 {
-  "error": "Invalid license key"
+  "key": "LICENSE-2025-XXX",
+  "hwid": "device-hardware-id"
 }
 ```
 
-#### 心跳接口
-```http
-POST http://localhost:8080/api/heartbeat
-Authorization: Bearer <token>
-```
-
-**正常响应 (200):**
+**响应:**
 ```json
 {
   "status": "alive"
 }
 ```
 
-**无效响应 (401/403):**
-```json
-{
-  "status": "dead"
-}
+---
+
+## 📊 完整 API 文档
+
+### 客户端 API (公开)
+
+| 端点 | 方法 | 说明 | 请求体 |
+|------|------|------|--------|
+| `/api/activate` | POST | 激活许可证 | `{key, hwid}` |
+| `/api/heartbeat` | POST | 心跳验证 | `{key, hwid}` (需要 token) |
+
+### 管理 API (需要认证)
+
+| 端点 | 方法 | 说明 | 请求体 |
+|------|------|------|--------|
+| `/api/admin/license` | POST | 生成许可证 | `{key, max_devices, validity_days, note}` |
+| `/api/admin/license` | GET | 获取许可证详情 | query: `?key=xxx` |
+| `/api/admin/license` | PUT | 更新许可证 | `{key, max_devices?, status?}` |
+| `/api/admin/license` | DELETE | 删除许可证 | query: `?key=xxx` |
+| `/api/admin/licenses` | GET | 获取许可证列表 | query: `?status=xxx&user_id=xxx` |
+| `/api/admin/licenses/batch` | POST | 批量生成 | `{count, prefix, max_devices, validity_days, note}` |
+| `/api/admin/stats` | GET | 统计数据 | - |
+
+### Web 管理界面
+
+| 路径 | 说明 |
+|------|------|
+| `/login.html` | 登录页面 |
+| `/index.html` | 管理后台 |
+| `/test.html` | API 测试页面 |
+
+**默认登录信息:**
+```
+用户名: lazywords
+密码: w7168855
 ```
 
-## 代码模块说明
+⚠️ **生产环境请务必修改密码!** 编辑 [server/frontend/login.html](server/frontend/login.html) 中的 `validUsers` 对象。
 
-### 1. hwid/hwid.go - 硬件ID生成
+---
 
-**功能：**
-- 跨平台硬件指纹生成
-- Windows: 使用WMIC获取CPU/主板/磁盘序列号
-- Linux: 读取 `/proc/cpuinfo` 和 `/etc/machine-id`
-- macOS: 使用 `ioreg` 获取硬件UUID和序列号
-- 返回SHA256哈希值作为稳定标识
+## 🛠️ 数据库结构
 
-**关键函数：**
-```go
-func GetHardwareID() (string, error)
+### licenses 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键 |
+| license_key | TEXT | 许可证密钥 (唯一) |
+| product_name | TEXT | 产品名称 |
+| hwid | TEXT | 绑定的硬件ID |
+| status | TEXT | 状态: unused/active/expired/banned |
+| max_devices | INTEGER | 最大设备数 |
+| validity_days | INTEGER | **有效期天数** (新) |
+| expires_at | DATETIME | **过期时间** (激活时设置) |
+| activated_at | DATETIME | 激活时间 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+| user_id | INTEGER | 用户ID (可选) |
+| order_id | TEXT | 订单ID (可选) |
+| last_heartbeat | DATETIME | 最后心跳时间 |
+| note | TEXT | **备注** (新) |
+
+---
+
+## 💡 工作流程
+
+### 旧流程 (已弃用)
+```
+1. 管理员生成许可证 → 设置绝对过期日期 (如 2026-01-01)
+2. 客户激活许可证 → 验证是否过期 (根据绝对日期)
 ```
 
-### 2. auth/auth.go - 认证模块
+### 新流程 (当前版本)
+```
+1. 管理员生成许可证
+   ↓
+   设置 validity_days = 365 天
+   expires_at = NULL
 
-**功能：**
-- 许可证激活逻辑
-- JWT令牌管理
-- 心跳请求发送
-- SSL Pinning预留接口（TODO注释）
+2. 客户首次激活
+   ↓
+   计算 expires_at = 当前时间 + 365 天
+   保存 activated_at = 当前时间
+   绑定 hwid
 
-**关键类型：**
-```go
-type Client struct {
-    ServerURL  string
-    HTTPClient *http.Client
-    Token      string
-}
+3. 后续验证
+   ↓
+   检查 hwid 是否匹配
+   检查 expires_at 是否过期
 ```
 
-**关键函数：**
-```go
-func (c *Client) Activate(licenseKey, hwid string) error
-func (c *Client) Heartbeat() error
-```
+**优势:**
+- ✅ 许可证可以提前生成,不用担心过期
+- ✅ 激活时间更准确反映实际使用时间
+- ✅ 灵活的有效期管理
 
-### 3. heartbeat/heartbeat.go - 心跳监控
+---
 
-**功能：**
-- 后台Goroutine心跳循环
-- 重试逻辑（3次，2秒延迟）
-- 强制退出机制
-- 错误回调支持
+## 📱 客户端集成示例
 
-**关键类型：**
-```go
-type Monitor struct {
-    client        AuthClient
-    interval      time.Duration
-    maxRetries    int
-    retryDelay    time.Duration
-}
-```
+### Go 客户端
 
-**关键函数：**
-```go
-func (m *Monitor) Start()                    // 启动监控
-func ForceExit(reason string)                // 强制终止
-func GracefulShutdown(reason string)         // 优雅关闭
-```
-
-### 4. main.go - 主程序
-
-**功能：**
-- 应用程序入口点
-- 配置加载
-- 模块编排
-- 业务逻辑占位符
-
-**关键函数：**
-```go
-func main()                      // 主入口
-func loadConfig() (*Config, error)
-func RunMainApp()                // 业务逻辑占位符（替换为实际代码）
-```
-
-## 生产环境部署指南
-
-### 📦 服务器端部署
-
-#### 方式一：直接运行（推荐用于开发/测试）
-
-1. **编译服务器端**
-```bash
-cd server
-go build -o license-server
-```
-
-2. **配置环境变量**
-```bash
-export PORT=8080              # 监听端口
-export DB_PATH=./licenses.db  # 数据库文件路径
-export JWT_SECRET=your-secret-key-here  # JWT密钥（重要！）
-```
-
-3. **启动服务器**
-```bash
-./license-server
-```
-
-#### 方式二：Docker 部署（推荐用于生产）
-
-1. **创建 Dockerfile**
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN cd server && go mod download
-RUN cd server && go build -ldflags="-s -w" -o license-server
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/server/license-server .
-EXPOSE 8080
-CMD ["./license-server"]
-```
-
-2. **构建并运行**
-```bash
-docker build -t license-server:latest .
-docker run -d \
-  -p 8080:8080 \
-  -e JWT_SECRET=your-secret-key \
-  -v $(pwd)/data:/root/data \
-  --name license-server \
-  license-server:latest
-```
-
-#### 方式三：systemd 服务（Linux 服务器）
-
-1. **创建服务文件** `/etc/systemd/system/license-server.service`
-```ini
-[Unit]
-Description=License Server
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/license-server
-ExecStart=/opt/license-server/license-server
-Environment="PORT=8080"
-Environment="DB_PATH=/var/lib/license-server/licenses.db"
-Environment="JWT_SECRET=your-secret-key-here"
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-2. **启动服务**
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable license-server
-sudo systemctl start license-server
-sudo systemctl status license-server
-```
-
-#### 反向代理配置（Nginx + SSL）
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name license.yourdomain.com;
-
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-### 🖥️ 客户端集成指南
-
-#### 集成到现有 EXE 程序的三种方式
-
-##### 方式一：作为独立进程（推荐 - 最简单）
-
-**原理**：你的主程序在启动时先调用验证程序，验证通过后才继续运行。
-
-1. **编译验证客户端**
-```bash
-# Windows 64位
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o drm-validator.exe
-
-# 压缩（可选）
-upx --best drm-validator.exe
-```
-
-2. **在你的程序中调用**（任何语言都可以）
-
-**C# 示例**：
-```csharp
-using System;
-using System.Diagnostics;
-
-class Program {
-    static void Main() {
-        // 调用验证程序
-        var process = new Process {
-            StartInfo = new ProcessStartInfo {
-                FileName = "drm-validator.exe",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true
-            }
-        };
-
-        process.Start();
-        process.WaitForExit();
-
-        if (process.ExitCode != 0) {
-            Console.WriteLine("License validation failed!");
-            Environment.Exit(1);
-        }
-
-        // 验证通过，继续你的程序逻辑
-        Console.WriteLine("License valid! Starting main application...");
-        RunYourApp();
-    }
-}
-```
-
-**Python 示例**：
-```python
-import subprocess
-import sys
-
-# 调用验证程序
-result = subprocess.run(['drm-validator.exe'], capture_output=True)
-
-if result.returncode != 0:
-    print("License validation failed!")
-    sys.exit(1)
-
-# 验证通过
-print("License valid! Starting main application...")
-run_your_app()
-```
-
-**C++ 示例**：
-```cpp
-#include <windows.h>
-#include <iostream>
-
-int main() {
-    STARTUPINFO si = {sizeof(si)};
-    PROCESS_INFORMATION pi;
-
-    if (!CreateProcess("drm-validator.exe", NULL, NULL, NULL, FALSE,
-                       0, NULL, NULL, &si, &pi)) {
-        std::cerr << "Failed to start validator" << std::endl;
-        return 1;
-    }
-
-    WaitForSingleObject(pi.hProcess, INFINITE);
-
-    DWORD exitCode;
-    GetExitCodeProcess(pi.hProcess, &exitCode);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-
-    if (exitCode != 0) {
-        std::cerr << "License validation failed!" << std::endl;
-        return 1;
-    }
-
-    // 验证通过
-    std::cout << "License valid! Starting main application..." << std::endl;
-    RunYourApp();
-    return 0;
-}
-```
-
-##### 方式二：作为 DLL/动态链接库
-
-1. **将 Go 代码编译为 C 兼容的 DLL**
-
-修改 `main.go`，导出 C 函数：
 ```go
 package main
 
-import "C"
 import (
-    "github.com/Lazywords2006/web/auth"
-    "github.com/Lazywords2006/web/hwid"
-    "github.com/Lazywords2006/web/heartbeat"
+    "yourproject/auth"
+    "yourproject/hwid"
+    "yourproject/heartbeat"
 )
 
-var monitor *heartbeat.Monitor
+func main() {
+    // 1. 生成硬件ID
+    hwidStr, _ := hwid.GetHardwareID()
 
-//export ValidateLicense
-func ValidateLicense(serverURL *C.char, licenseKey *C.char) C.int {
-    // 转换C字符串
-    url := C.GoString(serverURL)
-    key := C.GoString(licenseKey)
+    // 2. 创建认证客户端
+    client := auth.NewClient("http://localhost:8080")
 
-    // 执行验证逻辑
-    client := auth.NewClient(url)
-    hwid, _ := hwid.GetHardwareID()
-
-    if err := client.Activate(key, hwid); err != nil {
-        return 0 // 失败
+    // 3. 激活许可证
+    err := client.Activate("LICENSE-2025-XXX", hwidStr)
+    if err != nil {
+        log.Fatal("激活失败:", err)
     }
 
-    // 启动心跳
-    monitor = heartbeat.NewMonitor(client, 30, 3, 2)
-    go monitor.Start()
+    // 4. 启动心跳监控
+    monitor := heartbeat.NewMonitor(client, 30*time.Second, 3, 2*time.Second)
+    monitor.Start()
 
-    return 1 // 成功
+    // 5. 运行业务逻辑
+    RunMainApp()
 }
-
-//export StopValidation
-func StopValidation() {
-    if monitor != nil {
-        // 停止监控（需要添加Stop方法）
-    }
-}
-
-func main() {}
 ```
 
-2. **编译为 DLL**
-```bash
-go build -buildmode=c-shared -o drm-validator.dll
-```
+### C# 客户端
 
-3. **在你的程序中调用**
-
-**C# 示例**：
 ```csharp
-using System.Runtime.InteropServices;
+var client = new HttpClient();
+var data = new {
+    key = "LICENSE-2025-XXX",
+    hwid = GetHardwareID()
+};
+var json = JsonSerializer.Serialize(data);
+var response = await client.PostAsync(
+    "http://localhost:8080/api/activate",
+    new StringContent(json, Encoding.UTF8, "application/json")
+);
+```
 
-class DRMValidator {
-    [DllImport("drm-validator.dll")]
-    private static extern int ValidateLicense(string serverURL, string licenseKey);
+### Python 客户端
 
-    [DllImport("drm-validator.dll")]
-    private static extern void StopValidation();
+```python
+import requests
 
-    public static bool Validate(string serverURL, string key) {
-        return ValidateLicense(serverURL, key) == 1;
+response = requests.post(
+    "http://localhost:8080/api/activate",
+    json={
+        "key": "LICENSE-2025-XXX",
+        "hwid": get_hardware_id()
     }
-}
+)
 
-// 使用
-if (!DRMValidator.Validate("https://license.yourdomain.com", "YOUR-KEY")) {
-    Console.WriteLine("License validation failed!");
-    Environment.Exit(1);
-}
+if response.json()["status"] == "success":
+    token = response.json()["token"]
+    # 保存 token 用于后续心跳验证
 ```
 
-##### 方式三：嵌入到主程序（最隐蔽）
+---
 
-将验证程序作为资源嵌入到你的 EXE 中：
+## 🔧 配置说明
 
-1. **将 drm-validator.exe 转换为 Base64 或二进制资源**
-```bash
-# PowerShell
-$bytes = [System.IO.File]::ReadAllBytes("drm-validator.exe")
-[System.Convert]::ToBase64String($bytes) > validator.b64
-```
+### 服务器环境变量
 
-2. **在运行时解压并执行**
-```csharp
-// 从资源中提取验证器
-byte[] validatorBytes = Convert.FromBase64String(Properties.Resources.ValidatorBase64);
-string tempPath = Path.Combine(Path.GetTempPath(), "drm-validator.exe");
-File.WriteAllBytes(tempPath, validatorBytes);
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | 8080 | 监听端口 |
+| `DB_PATH` | ./licenses.db | 数据库文件路径 |
+| `JWT_SECRET` | (自动生成) | JWT 签名密钥 |
 
-// 执行验证
-var process = Process.Start(tempPath);
-process.WaitForExit();
+### 客户端配置文件 (config.json)
 
-// 清理临时文件
-File.Delete(tempPath);
-
-if (process.ExitCode != 0) {
-    Environment.Exit(1);
-}
-```
-
-### 🔧 配置客户端
-
-在你的 EXE 同目录创建 `config.json`：
 ```json
 {
-  "server_url": "https://license.yourdomain.com",
-  "license_key": "",
-  "heartbeat_interval_seconds": 300,
+  "server_url": "http://your-server.com",
+  "license_key": "LICENSE-2025-XXX",
+  "heartbeat_interval_seconds": 30,
   "max_retries": 3,
   "retry_delay_seconds": 2
 }
 ```
 
-或使用环境变量：
-```bash
-set LICENSE_SERVER=https://license.yourdomain.com
-set LICENSE_KEY=YOUR-KEY-HERE
-```
+---
 
-### 🔐 安全加固（生产必须！）
+## 🚀 部署指南
 
-#### 1. 启用 SSL Pinning
-
-编辑 `auth/auth.go:35`：
-```go
-// 加载证书
-certPool := x509.NewCertPool()
-cert, _ := ioutil.ReadFile("server.crt")
-certPool.AppendCertsFromPEM(cert)
-
-Transport: &http.Transport{
-    TLSClientConfig: &tls.Config{
-        RootCAs:      certPool,
-        MinVersion:   tls.VersionTLS12,
-    },
-}
-```
-
-#### 2. 添加请求签名
-
-编辑 `auth/auth.go:67` 和 `:121`：
-```go
-import "crypto/hmac"
-import "crypto/sha256"
-
-func generateHMAC(data []byte, secret string) string {
-    h := hmac.New(sha256.New, []byte(secret))
-    h.Write(data)
-    return hex.EncodeToString(h.Sum(nil))
-}
-
-// 在发送请求前
-signature := generateHMAC(jsonData, "your-shared-secret")
-req.Header.Set("X-Request-Signature", signature)
-req.Header.Set("X-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
-```
-
-#### 3. 代码混淆
+### 开发环境
 
 ```bash
-# 安装 garble
-go install mvdan.cc/garble@latest
+# 启动服务器
+cd server
+go run main.go
 
-# 混淆编译
-garble -literals -tiny build -ldflags="-s -w" -o secure-client.exe
+# 访问管理界面
+open http://localhost:8080/login.html
 ```
 
-#### 4. 编译优化
+### 生产环境 (Docker)
+
+```dockerfile
+FROM golang:1.21-alpine AS builder
+WORKDIR /app
+COPY server/ ./
+RUN go mod download
+RUN go build -ldflags="-s -w" -o server main.go
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=builder /app/server .
+COPY --from=builder /app/frontend ./frontend
+EXPOSE 8080
+CMD ["./server"]
+```
+
+**构建并运行:**
+```bash
+docker build -t license-server .
+docker run -d -p 8080:8080 \
+  -e JWT_SECRET=your-secret \
+  -v $(pwd)/data:/root/data \
+  --name license-server \
+  license-server
+```
+
+### 数据库迁移 (如果从旧版本升级)
 
 ```bash
-# 最小化二进制
-go build -ldflags="-s -w" -o secure-client.exe
-
-# UPX 压缩
-upx --best --ultra-brute secure-client.exe
+sqlite3 server/licenses.db << 'EOF'
+ALTER TABLE licenses ADD COLUMN validity_days INTEGER DEFAULT 365;
+ALTER TABLE licenses ADD COLUMN note TEXT;
+EOF
 ```
-
-### 📊 管理许可证
-
-#### 使用 API 生成许可证
-
-```bash
-# 生成新许可证
-curl -X POST https://license.yourdomain.com/api/admin/license \
-  -H "Content-Type: application/json" \
-  -d '{
-    "key": "CUSTOM-KEY-2024-001",
-    "max_devices": 3,
-    "expiry_date": "2025-12-31T23:59:59Z",
-    "note": "Customer: John Doe"
-  }'
-
-# 查询许可证
-curl "https://license.yourdomain.com/api/admin/license?key=CUSTOM-KEY-2024-001"
-
-# 获取统计
-curl "https://license.yourdomain.com/api/admin/stats"
-```
-
-#### 管理前端（可选）
-
-将前端文件放到 `server/frontend/` 目录，通过浏览器访问：
-```
-http://license.yourdomain.com/
-```
-
-## 测试
-
-### 模拟许可证服务器
-
-创建一个简单的测试服务器（test-server.go）：
-
-```go
-package main
-
-import (
-    "encoding/json"
-    "log"
-    "net/http"
-)
-
-func main() {
-    http.HandleFunc("/api/activate", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(map[string]string{
-            "status": "success",
-            "token":  "mock-jwt-token-abc123",
-        })
-    })
-
-    http.HandleFunc("/api/heartbeat", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(map[string]string{
-            "status": "alive",
-        })
-    })
-
-    log.Println("Mock server running on :8080")
-    http.ListenAndServe(":8080", nil)
-}
-```
-
-运行测试服务器：
-```bash
-go run test-server.go
-```
-
-### 单元测试
-
-运行所有测试：
-```bash
-go test ./...
-```
-
-## 常见问题
-
-### Q: 如何更换业务逻辑？
-**A:** 修改 `main.go` 中的 `RunMainApp()` 函数，替换为您的实际应用代码。
-
-### Q: 心跳间隔太频繁怎么办？
-**A:** 在 `config.json` 中调整 `heartbeat_interval_seconds` 参数。
-
-### Q: 如何处理网络不稳定？
-**A:** 增加 `max_retries` 和 `retry_delay_seconds` 参数。
-
-### Q: 可以在无网络环境使用吗？
-**A:** 不可以。这是"Always-Online"系统，必须保持网络连接。如需离线模式，需要修改架构。
-
-### Q: 如何禁用心跳监控？
-**A:** 不建议禁用。如果确实需要，注释掉 `main.go` 中的心跳启动代码（第64-72行）。
-
-## 许可证
-
-本项目代码仅供学习和研究使用。
-
-## 贡献
-
-欢迎提交Issue和Pull Request。
-
-## 联系方式
-
-如有问题，请创建Issue或联系项目维护者。
 
 ---
 
-**⚠️ 重要提示：**
-- 此系统设计用于合法的软件保护目的
-- 请确保遵守当地法律法规
-- 不要用于恶意软件或非法用途
-- 生产环境部署前请进行充分的安全审计
+## 📚 相关文档
+
+- [集成到EXE的完整指南.md](./docs/集成到EXE的完整指南.md) - 详细的 EXE 集成步骤
+- [Python_GUI_使用说明.md](./docs/Python_GUI_使用说明.md) - Python GUI 示例程序使用说明
+- [Python GUI 示例代码](./examples/python_gui_example.py) - 完整的示例代码
+- [项目结构说明.md](./项目结构说明.md) - 项目文件夹结构说明
+
+---
+
+## 🧪 测试
+
+### 测试服务器是否正常运行
+
+```bash
+# 检查服务器状态
+curl http://localhost:8080/api/admin/stats
+
+# 期望输出
+# {"licenses":{"total":0,"active":0,"unused":0,"expired":0,"banned":0},"today_activations":0,"users":1}
+```
+
+### 测试生成许可证
+
+```bash
+curl -X POST http://localhost:8080/api/admin/license \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "TEST-2025-001",
+    "max_devices": 3,
+    "validity_days": 365,
+    "note": "测试许可证"
+  }'
+```
+
+### 测试激活许可证
+
+```bash
+curl -X POST http://localhost:8080/api/activate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "TEST-2025-001",
+    "hwid": "test-device-001"
+  }'
+```
+
+---
+
+## 🔒 安全建议
+
+### 开发环境
+- ✅ 使用 HTTP 即可
+- ✅ 使用默认配置快速开发
+
+### 生产环境
+- ⚠️ **必须启用 HTTPS** - 使用 Let's Encrypt 或云服务商证书
+- ⚠️ **修改默认密码** - 编辑 frontend/login.html
+- ⚠️ **使用强 JWT 密钥** - 设置 `JWT_SECRET` 环境变量
+- ⚠️ **添加访问频率限制** - 防止暴力破解
+- ⚠️ **定期备份数据库** - `licenses.db` 文件
+- ⚠️ **使用防火墙** - 仅开放必要端口
+- ⚠️ **启用日志监控** - 监控异常激活行为
+
+---
+
+## 🐛 故障排查
+
+### 问题 1: 端口被占用
+
+```bash
+# 查找占用进程
+lsof -i :8080
+
+# 停止进程
+kill -9 <PID>
+
+# 或修改端口
+export PORT=9000
+```
+
+### 问题 2: 数据库权限错误
+
+```bash
+# 确保数据库文件有读写权限
+chmod 644 server/licenses.db
+```
+
+### 问题 3: 许可证列表为空
+
+检查服务器日志:
+```bash
+tail -f server/server.log
+```
+
+确认数据库是否有数据:
+```bash
+sqlite3 server/licenses.db "SELECT COUNT(*) FROM licenses;"
+```
+
+### 问题 4: 激活失败
+
+常见原因:
+- 许可证密钥不存在
+- 许可证已被封禁 (status='banned')
+- 许可证已在其他设备激活 (hwid 不匹配)
+- 服务器地址配置错误
+
+查看详细错误日志:
+```bash
+tail -50 server/server.log | grep Activate
+```
+
+---
+
+## 📊 常见有效期设置
+
+| 套餐类型 | validity_days | 说明 |
+|----------|---------------|------|
+| 试用版 | 7 | 7天试用 |
+| 月卡 | 30 | 1个月 |
+| 季卡 | 90 | 3个月 |
+| 半年卡 | 180 | 6个月 |
+| 年卡 | 365 | 1年 |
+| 两年卡 | 730 | 2年 |
+| 终身版 | 36500 | 100年 (相当于终身) |
+
+---
+
+## 🎯 使用场景
+
+### 场景 1: 软件销售
+```
+1. 客户购买后,管理员生成许可证 (validity_days=365)
+2. 将许可证密钥发送给客户
+3. 客户在软件中输入密钥激活
+4. 软件开始计时,365天后到期
+```
+
+### 场景 2: 代理商批发
+```
+1. 代理商购买100个许可证
+2. 管理员批量生成 (count=100, validity_days=180)
+3. 导出许可证列表给代理商
+4. 代理商分发给终端用户
+5. 用户激活时才开始计时
+```
+
+### 场景 3: 促销活动
+```
+1. 活动期间批量生成优惠许可证
+2. 设置短期有效期 (validity_days=30)
+3. 发放给活动参与者
+4. 激活后30天到期
+```
+
+---
+
+## 📞 技术支持
+
+遇到问题请检查:
+1. **服务器日志**: `server/server.log`
+2. **数据库数据**: `sqlite3 server/licenses.db`
+3. **浏览器控制台**: F12 查看前端错误
+4. **网络连接**: 确认服务器可访问
+
+---
+
+## 📝 更新日志
+
+### v2.0.0 (当前版本) - 2025-12-14
+
+**新增功能:**
+- ✅ 激活时计算过期时间 (validity_days 模式)
+- ✅ 批量生成许可证功能
+- ✅ 许可证备注字段
+- ✅ 前端界面优化
+
+**改进:**
+- 🔧 完善 NULL 值处理
+- 🔧 优化日志输出
+- 🔧 前端显示逻辑改进 (未激活显示有效期,已激活显示过期时间)
+
+**API 变更:**
+- ⚠️ `POST /api/admin/license` 请求参数从 `expiry_date` 改为 `validity_days`
+- ⚠️ 新增 `POST /api/admin/licenses/batch` 批量生成接口
+
+**数据库变更:**
+- 📊 新增 `validity_days` 字段
+- 📊 新增 `note` 字段
+- 📊 `expires_at` 在未激活时为 NULL
+
+**兼容性:**
+- ✅ 旧许可证正常工作
+- ✅ 自动添加默认 `validity_days = 365`
+- ✅ 客户端 API 无变更
+
+---
+
+## 📄 许可证
+
+MIT License
+
+---
+
+## 🎉 总结
+
+本项目提供了一套完整的许可证管理解决方案:
+
+1. **灵活的有效期管理** - 激活时计算过期时间
+2. **批量操作支持** - 提高许可证发放效率
+3. **完善的 Web 界面** - 可视化管理所有许可证
+4. **跨平台客户端** - 支持 Windows/Linux/macOS
+5. **跨语言 API** - 任何语言都可以集成
+6. **开箱即用** - 无需复杂配置
+
+**快速上手:**
+```bash
+cd server && go run main.go
+open http://localhost:8080/login.html
+```
+
+开始构建你的许可证管理系统吧! 🚀

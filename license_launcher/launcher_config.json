@@ -1,0 +1,6 @@
+{
+  "server_url": "http://localhost:8080",
+  "target_exe": "lzy_zte_12.10.exe",
+  "license_file": ".license",
+  "use_gui": "auto"
+}
