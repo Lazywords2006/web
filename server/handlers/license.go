@@ -40,7 +40,15 @@ func HandleActivate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Activate] Request: key=%s, hwid=%s...", req.Key, truncate(req.HWID, 16))
+	log.Printf("[Activate] Request: key=%s, hwid=%s... (len=%d)", req.Key, truncate(req.HWID, 16), len(req.HWID))
+
+	// 检查 hwid 是否为空
+	if req.HWID == "" {
+		log.Printf("[Activate] WARNING: Received empty HWID from client")
+		logActivation(req.Key, req.HWID, "activate", r, false, "Empty HWID")
+		respondError(w, "Hardware ID is required", http.StatusBadRequest)
+		return
+	}
 
 	// 查询许可证
 	var license models.License
@@ -141,7 +149,13 @@ func HandleActivate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Printf("[Activate] License activated successfully, expires_at=%s (%d days)", expiresAt.Format("2006-01-02"), validityDays)
+		log.Printf("[Activate] License activated successfully, hwid=%s (len=%d), expires_at=%s (%d days)",
+			truncate(req.HWID, 16), len(req.HWID), expiresAt.Format("2006-01-02"), validityDays)
+
+		// 验证数据库写入
+		var savedHWID string
+		database.DB.QueryRow("SELECT hwid FROM licenses WHERE id = ?", license.ID).Scan(&savedHWID)
+		log.Printf("[Activate] Verification: Saved HWID length = %d", len(savedHWID))
 	} else {
 		// 已激活，验证HWID
 		log.Printf("[Activate] License already active, validating HWID")
